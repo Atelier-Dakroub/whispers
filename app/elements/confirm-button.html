@@ -1,0 +1,82 @@
+<!-- A destructive action, behind a confirmation, with no JavaScript.
+
+     `command` and `commandfor` are the platform's invoker. A button carrying
+     them opens the dialog it names, and the browser supplies everything a
+     confirmation needs and everything a hand-rolled modal gets wrong: the
+     backdrop, the focus trap, Escape to dismiss, the rest of the page made
+     inert, and focus returned to the button afterwards.
+
+     Writing a click handler for this is the common mistake. It ships script,
+     it needs a CSP hash, and it loses all of the above.
+
+     The dialog holds an ordinary <form method="post">, so confirming is a form
+     submission to the page it sits on. Nothing here knows what it deletes: the
+     caller passes the field to send, and any others as children.
+
+         <confirm-button
+           key="${item.id}"
+           heading="Delete this headline?"
+           detail="${item.headline}"
+           value="delete"
+         >
+           <input type="hidden" name="id" value="${item.id}" />
+         </confirm-button>
+
+     A cancel is `command="close"`, not `<form method="dialog">`. Both close it
+     without submitting; the invoker keeps the pattern to one idea. -->
+
+<script properties>
+  export default {
+    /**
+     * Unique on the page. It becomes the dialog's id, which `commandfor` needs.
+     *
+     * Not `key`: that is one of the framework's directives — identity for a
+     * repeated element — so the compiler consumes the attribute and the prop
+     * arrives empty. Every dialog then answers to `id="confirm-"`, they all
+     * collide, and the invoker opens whichever came first.
+     */
+    token: '',
+    /** The button in the page. */
+    label: 'Delete',
+    /** The dialog's heading, and its accessible name. */
+    heading: 'Are you sure?',
+    /** The thing being acted on, quoted back so nobody confirms the wrong row. */
+    detail: '',
+    /** Under the heading. Say what cannot be undone. */
+    note: 'This cannot be undone.',
+    /** The button that does it. */
+    confirm: 'Delete',
+    /** The button that does not. It takes focus, so Enter is never the destructive one. */
+    cancel: 'Keep it',
+    /** The field the confirming button submits. */
+    name: 'intent',
+    value: 'delete',
+  };
+</script>
+
+<button type="button" class="danger" command="show-modal" commandfor="confirm-${token}">
+  ${label}
+</button>
+
+<dialog id="confirm-${token}" class="confirm" aria-labeledby="confirm-${token}-heading">
+  <form method="post">
+    <h2 id="confirm-${token}-heading">${heading}</h2>
+
+    <!-- Rendered even when empty rather than behind an `if`. A light element
+         writes into DOM it already rendered and never replaces a child, so a
+         condition over a prop — which can change — is a compile error telling
+         you to reach for a shadow root. An empty <p> is cheaper than a shadow
+         root, and this one is nearly always filled. -->
+    <p class="what">${detail}</p>
+    <p class="note">${note}</p>
+
+    <slot></slot>
+
+    <div class="actions">
+      <button type="button" class="quiet" command="close" commandfor="confirm-${token}" autofocus>
+        ${cancel}
+      </button>
+      <button type="submit" name="${name}" value="${value}" class="danger">${confirm}</button>
+    </div>
+  </form>
+</dialog>

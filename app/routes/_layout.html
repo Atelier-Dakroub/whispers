@@ -1,0 +1,104 @@
+<script server>
+  import { LOGO_DARK, stamp } from '../data/assets.js';
+  import { DENSITY, all as readSettings, colorScheme } from '../data/settings.js';
+  import { DEFAULT_HEADLINE, DEFAULT_INTERFACE, stackOf } from '../lib/fonts.js';
+  import { directionOf } from '../lib/locale.js';
+  import { stringsFor } from '../lib/strings.js';
+
+  // This layout does not read a cookie, and that is a decision rather than an
+  // omission. Reading one makes every page below it personal: the cache refuses
+  // to hold it and the build refuses to write it. So the masthead says nothing
+  // about who you are, and the admin lives behind /admin, whose own layout reads
+  // the session. The reader's page stays cacheable.
+  export default async () => {
+    const site = await readSettings();
+
+    return {
+      site,
+      scheme: colorScheme(site),
+      // The config's `lang` is one value for the whole app; this site's language
+      // is a setting, so it has to be written here or a French install claims to
+      // be English.
+      s: stringsFor(site.locale),
+      density: DENSITY[site.density] ?? DENSITY.normal,
+      // `0` rather than `none`, so the shorthand below still names a style and a
+      // color and only the width changes.
+      rule: site.rules ? '1px' : '0',
+      lang: site.locale,
+      dir: directionOf(site.locale),
+      // Resolved here rather than in the template, so a stack that was renamed
+      // or removed falls back instead of rendering an empty font-family.
+      headline: stackOf(site.fontHeadline, DEFAULT_HEADLINE).css,
+      ui: stackOf(site.fontInterface, DEFAULT_INTERFACE).css,
+      // A version stamp, not the bytes. /logo is cached for a year, so a
+      // replaced logo needs a different URL or nobody sees it.
+      logo: await stamp(),
+      logoDark: await stamp(LOGO_DARK),
+    };
+  };
+</script>
+
+<html lang="${lang}" dir="${dir}" style="color-scheme: ${scheme}" />
+
+<!-- Six custom properties, set from the database on every render.
+     `${…}` inside a <style> block is a compile error — text there reaches the
+     page as written, so a value would land in code. An attribute is the way
+     through, and an attribute is escaped. -->
+<body
+  style="--bg-l: ${site.bgLight}; --ink-l: ${site.inkLight}; --link-l: ${site.linkLight}; --bg-d: ${site.bgDark}; --ink-d: ${site.inkDark}; --link-d: ${site.linkDark}; --font-head: ${headline}; --font-ui: ${ui}; --leading: ${density.leading}; --row-pad: ${density.pad}; --headline-rule: ${rule}; --flash-l: ${site.breakingLight}; --flash-d: ${site.breakingDark}"
+/>
+
+<meta name="color-scheme" content="${scheme}" />
+
+<a class="skip" href="#headlines">${s.skip}</a>
+
+<header class="masthead">
+  <a class="wordmark" href="/">
+    <!-- Which artwork, and who decides. This is the whole subtlety of a second
+         logo, and it is easy to get wrong in a way that only shows on somebody
+         else's machine.
+
+         `prefers-color-scheme` is the reader's own setting. `color-scheme` on
+         <html> is this site's. The two agree only when the theme is automatic,
+         so the media query is used only then. Pin the site to dark and a reader
+         whose laptop is in light mode would otherwise be handed the light
+         artwork on a dark masthead: the exact failure the second upload exists
+         to prevent.
+
+         Automatic asks the reader. A pinned theme asks nobody. -->
+    <picture if="logo && logoDark && site.themeMode === 'auto'">
+      <source media="(prefers-color-scheme: dark)" srcset="/logo?dark&amp;v=${logoDark}" />
+      <img src="/logo?v=${logo}" alt="${site.title}" class="logo" />
+    </picture>
+
+    <img
+      else-if="logoDark && site.themeMode === 'dark'"
+      src="/logo?dark&amp;v=${logoDark}"
+      alt="${site.title}"
+      class="logo"
+    />
+
+    <img else-if="logo" src="/logo?v=${logo}" alt="${site.title}" class="logo" />
+
+    <span else>${site.title}</span>
+  </a>
+
+  <p class="tagline" if="site.tagline">${site.tagline}</p>
+</header>
+
+<main id="headlines"><slot></slot></main>
+
+<footer class="colophon">
+  <a href="/feed.xml">${s.feed}</a>
+  <a href="/login">${s.signIn}</a>
+
+  <!-- On by default, and a setting can turn it off.
+       Not enforced, deliberately. The licence asks a personal site to keep it,
+       and the product's own promise is that there is no key to enter and
+       nothing counting installs — so a technical lock here would make that
+       promise false. The admin says which licence expects what, and then
+       trusts the owner. -->
+  <a class="credit" if="site.credit" href="https://whispers.news" rel="noopener">
+    ${s.poweredBy}
+  </a>
+</footer>

@@ -1,0 +1,877 @@
+/* One stylesheet for the whole site.
+
+   Every direction-sensitive rule is written with logical properties —
+   `margin-inline-start` rather than `margin-left` — so `dir="rtl"` on <html>
+   mirrors the layout on its own. The locale setting decides that attribute, so
+   an Arabic or Hebrew site needs nothing else here.
+ It goes through Vite, so nesting works,
+   and the build hashes and compresses it.
+
+   The six colors and the two font stacks come from the database and arrive as
+   custom properties on <body>, set by the layout. Everything here is written against the derived
+   tokens below, so changing a color in the admin changes the whole site and
+   nothing here has to know about it.
+
+   Light and dark are `light-dark()` over `color-scheme`, which the layout sets
+   from the theme setting. No script, no cookie, no flash: the browser resolves
+   it before the first paint. */
+
+body {
+  --bg: light-dark(var(--bg-l), var(--bg-d));
+  --ink: light-dark(var(--ink-l), var(--ink-d));
+  --link: light-dark(var(--link-l), var(--link-d));
+
+  /* Derived rather than configured. Six colors is already a lot to ask
+     somebody to choose; a muted gray and a rule are arithmetic on two of them.
+     
+     But the arithmetic has to differ by polarity, and this is the part that was
+     wrong. One percentage cannot serve both: mixing 55% of the ink reaches
+     APCA Lc 70 on a light ground and Lc 33 on a dark one — and Lc 33 is not a
+     readable value for the day headings, sources and times this color carries.
+     The rule was worse: 15% computed to Lc 0.0 in dark mode, which is APCA's
+     way of saying the line was not there at all.
+     
+     So each is mixed twice, against the raw light and dark tokens rather than
+     the resolved ones, and `light-dark()` picks. Measured: muted clears Lc 60
+     and the rule is visible in both. */
+  --muted: light-dark(
+    color-mix(in oklab, var(--ink-l) 50%, var(--bg-l)),
+    color-mix(in oklab, var(--ink-d) 78%, var(--bg-d))
+  );
+  --rule: light-dark(
+    color-mix(in oklab, var(--ink-l) 22%, var(--bg-l)),
+    color-mix(in oklab, var(--ink-d) 45%, var(--bg-d))
+  );
+  --raised: light-dark(
+    color-mix(in oklab, var(--ink-l) 4%, var(--bg-l)),
+    color-mix(in oklab, var(--ink-d) 8%, var(--bg-d))
+  );
+  --danger: light-dark(#a3271f, #f0938a);
+
+  --measure: 46rem;
+
+  /* One height for every control, so a select and the input beside it line up.
+     A select's intrinsic height comes from the platform and is never the same
+     as an input's, so both are told. */
+  --control: 2.6rem;
+
+  margin: 0;
+  padding: 0 clamp(1rem, 5vw, 2.5rem) 4rem;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-head);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The reader's own preference wins over anything decorative. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+a {
+  color: var(--link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+
+/* Visible for a keyboard, absent for a mouse. Never `outline: none`. */
+:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.skip {
+  position: absolute;
+  inset-inline-start: -9999px;
+  top: 0;
+  background: var(--bg);
+  padding: 0.6rem 1rem;
+  z-index: 10;
+}
+.skip:focus {
+  inset-inline-start: 0;
+}
+
+/* ── masthead ─────────────────────────────────────────────────────────── */
+
+.masthead {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 2.5rem 0 1.25rem;
+  border-bottom: 2px solid var(--ink);
+  text-align: center;
+}
+
+.wordmark {
+  display: inline-block;
+  color: inherit;
+  text-decoration: none;
+  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.logo {
+  display: block;
+  /* `margin-inline: auto` and not `text-align`, because the image is a block:
+     centring its box is not the same as centring the line it sits on. */
+  margin-inline: auto;
+  max-width: min(100%, 22rem);
+  max-height: 4.5rem;
+  height: auto;
+  width: auto;
+}
+
+.tagline {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+main {
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+/* ── the headlines ────────────────────────────────────────────────────── */
+
+.day {
+  margin: 2rem 0 0;
+}
+
+.day-heading {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-ui);
+  /* 12.8px, not 11.5px. Small uppercase type is hard to read at any contrast,
+     and the fix for small is bigger before it is darker. */
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.headlines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.headlines.flat {
+  margin-top: 2rem;
+}
+
+.headlines li {
+  padding: var(--row-pad) 0;
+  /* A width of `0` rather than `border: none`, so the setting changes one value
+     and the style and color stay written down. */
+  border-bottom: var(--headline-rule) solid var(--rule);
+}
+
+/* The headline is the link, and it is the whole line: a bigger target than a
+   word or two, and nothing to aim at. */
+.headlines a,
+.headlines .sample {
+  font-size: 1.12rem;
+  line-height: var(--leading);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.headlines a:hover,
+.headlines a:focus-visible {
+  color: var(--link);
+  text-decoration: underline;
+}
+
+.source,
+.at {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* A separator drawn rather than typed. A literal "·" between the headline and
+   the source is read aloud, and gets underlined when the link is hovered. */
+.source::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 0.22em;
+  margin-inline: 0.15em 0.45em;
+}
+
+.at {
+  margin-inline-start: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 3rem 0;
+  color: var(--muted);
+}
+
+.pager {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+  margin: 2.5rem 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+}
+.pager .where {
+  color: var(--muted);
+}
+.pager a[rel="next"] {
+  margin-inline-start: auto;
+}
+
+.colophon {
+  display: flex;
+  gap: 1.25rem;
+  max-width: var(--measure);
+  margin: 3rem auto 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ── everything with a form in it ─────────────────────────────────────── */
+
+.sheet {
+  max-width: var(--measure);
+  margin: 2.5rem auto;
+  font-family: var(--font-ui);
+}
+
+.sheet h1 {
+  font-family: var(--font-head);
+  font-size: 1.7rem;
+  margin: 0 0 0.35rem;
+}
+
+.sheet h2 {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 2.25rem 0 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.lede {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.field {
+  display: block;
+  margin: 0 0 1rem;
+}
+
+.field > span {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.field .hint {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="url"],
+input[type="password"],
+input[type="number"],
+input[type="datetime-local"],
+input[type="file"],
+select {
+  width: 100%;
+  box-sizing: border-box;
+  /* 16px, because iOS Safari zooms the page for anything smaller. */
+  font: inherit;
+  font-size: 16px;
+  height: var(--control);
+  padding: 0 0.6rem;
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+/* A file input draws its own button, and a fixed height clips it. */
+input[type="file"] {
+  height: auto;
+  min-height: var(--control);
+  padding: 0.5rem 0.6rem;
+}
+
+/* The platform's own arrow sits hard against the border on Edge and Windows
+   Chrome, and there is no property that moves it. `appearance: none` removes it
+   and the wrapper below draws one, which also means it follows `currentColor`
+   into dark mode instead of staying whatever gray the platform picked. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 2.1rem;
+}
+
+.select {
+  position: relative;
+  display: block;
+}
+
+/* A chevron out of two borders rather than an image: it inherits the text
+   color, so it needs no second copy for dark mode and no data URI. */
+.select::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: 0.85rem;
+  top: 50%;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-65%) rotate(45deg);
+  opacity: 0.55;
+  /* The arrow is decoration sitting over the control. Without this, a click on
+     it does not open the menu. */
+  pointer-events: none;
+}
+
+/* Firefox keeps a focus ring on the text of a select with appearance removed. */
+select:-moz-focusring {
+  color: transparent;
+  text-shadow: 0 0 0 var(--ink);
+}
+
+/* A circle. `appearance: none` is what makes this possible at all — a color
+   input draws a platform widget, and the swatch inside it is a shadow part with
+   its own border and padding that the outer border-radius does not clip. All
+   three have to be told, or the result is a round box with a square color in
+   it. */
+input[type="color"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: var(--control);
+  height: var(--control);
+  padding: 0;
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+input[type="color"][aria-invalid="true"] {
+  /* A one-pixel ring is lost against a circle of color. */
+  box-shadow: 0 0 0 2px var(--danger);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.row > * {
+  flex: 1 1 12rem;
+}
+
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+}
+.checkbox input {
+  /* 1rem is under the 24px minimum a pointer target wants. */
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.15rem 0 0;
+  accent-color: var(--link);
+}
+.checkbox span {
+  font-size: 0.88rem;
+}
+
+button,
+.button {
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  min-height: var(--control);
+  color: var(--bg);
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+button.quiet {
+  color: var(--ink);
+  background: transparent;
+  border-color: var(--rule);
+}
+
+button.danger {
+  color: var(--danger);
+  background: transparent;
+  border-color: color-mix(in oklab, var(--danger) 45%, var(--bg));
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+/* ── notices ──────────────────────────────────────────────────────────── */
+
+.notice {
+  margin: 0 0 1.25rem;
+  padding: 0.7rem 0.9rem;
+  border-inline-start: 3px solid var(--rule);
+  background: var(--raised);
+  font-size: 0.88rem;
+  border-start-end-radius: 4px;
+  border-end-end-radius: 4px;
+}
+
+.notice.bad {
+  border-inline-start-color: var(--danger);
+  color: var(--danger);
+}
+
+.notice.good {
+  border-inline-start-color: var(--link);
+}
+
+.error {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+
+.secret {
+  display: block;
+  margin: 0.5rem 0 0;
+  padding: 0.6rem 0.8rem;
+  background: var(--raised);
+  border: 1px dashed var(--rule);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  word-break: break-all;
+  user-select: all;
+}
+
+/* ── admin ────────────────────────────────────────────────────────────── */
+
+.admin-bar {
+  max-width: var(--measure);
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+}
+
+.admin-bar a[aria-current="page"] {
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.admin-bar .who {
+  margin-inline-start: auto;
+  color: var(--muted);
+}
+
+.admin-bar form {
+  display: inline;
+}
+
+.admin-bar button {
+  padding: 0.25rem 0.6rem;
+  min-height: 0;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--ink);
+  background: transparent;
+  border-color: var(--rule);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.rows .what {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.rows .what a {
+  font-family: var(--font-head);
+  font-size: 1.02rem;
+  color: var(--ink);
+}
+
+.rows .meta {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--muted);
+}
+
+.tag.draft {
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 40%, var(--bg));
+}
+
+.tag.flagged {
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 40%, var(--bg));
+}
+
+.schemes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+}
+
+.scheme {
+  margin: 0;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.scheme legend {
+  padding: 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.swatch span {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ── the confirmation dialog ──────────────────────────────────────────── */
+
+/* Opened by `command="show-modal"`, which is the platform's invoker and needs
+   no script. Everything below is appearance only: the focus trap, Escape, the
+   inert page underneath and the backdrop element itself are the browser's. */
+
+dialog.confirm {
+  max-width: min(30rem, calc(100vw - 2rem));
+  padding: 1.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+/* A literal, not `var(--ink)`. The top layer does not move the dialog out of
+   the DOM, so the dialog itself inherits the color tokens from <body> like any
+   other descendant — but `::backdrop` is a box with no parent in the tree, and
+   older engines inherit nothing into it. A custom property here would resolve
+   to nothing and the backdrop would vanish. */
+dialog.confirm::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+dialog.confirm h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+  border: 0;
+  padding: 0;
+}
+
+dialog.confirm .what {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+dialog.confirm .what:empty {
+  display: none;
+}
+
+dialog.confirm .note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+dialog.confirm .actions {
+  justify-content: flex-end;
+}
+
+confirm-button {
+  display: inline-flex;
+}
+
+.preview {
+  margin: 1.25rem 0 0.5rem 0;
+  padding: 1.1rem 1.25rem 1.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  /* The site's background, not the admin's panel color. A preview drawn on a
+     different ground is not previewing the ground. */
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-head);
+}
+
+.preview .day-heading {
+  margin-top: 0;
+}
+
+.preview .pager {
+  margin-top: 1.25rem;
+}
+
+/* The sample is not a link — it must not be tabbable and must not go anywhere —
+   so the hover color the real headline has is shown on the pager link instead,
+   which is where a reader sees `--link` on the site too. */
+.preview .sample {
+  cursor: default;
+}
+
+.preview-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* ── the two logo slots ───────────────────────────────────────────────── */
+
+.logos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+}
+
+.swatch-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Each preview sits on the ground it is for, not on whatever the admin's own
+   theme happens to be. A dark logo shown on a light panel tells you nothing
+   about the thing you are checking, which is the whole reason there are two. */
+.logo-ground {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 6rem;
+  padding: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.logo-ground.light {
+  background: var(--bg-l);
+  color: var(--ink-l);
+}
+
+.logo-ground.dark {
+  background: var(--bg-d);
+  color: var(--ink-d);
+}
+
+.logo-ground .none {
+  font-size: 0.78rem;
+  opacity: 0.6;
+}
+
+.logo-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.logo-slot .field {
+  width: 100%;
+  margin-bottom: 0.6rem;
+}
+
+/* ── breaking ─────────────────────────────────────────────────────────── */
+
+body {
+  --flash: light-dark(var(--flash-l), var(--flash-d));
+}
+
+.breaking {
+  margin: 1.75rem 0 0;
+}
+
+.breaking-label {
+  display: inline-block;
+  margin: 0 0 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: var(--flash);
+  padding: 0.16rem 0.5rem;
+}
+
+.breaking .headlines li {
+  border-bottom-color: color-mix(in oklab, var(--flash) 35%, var(--bg));
+}
+
+/* The color is the emphasis, and it is never the only one: the band carries a
+   BREAKING label in text above it, so a reader who cannot separate this red
+   from the body ink still knows what they are looking at. */
+.breaking .headlines a {
+  color: var(--flash);
+  font-weight: 600;
+}
+
+.breaking .headlines a:hover,
+.breaking .headlines a:focus-visible {
+  color: var(--flash);
+}
+
+.credit {
+  margin-inline-start: auto;
+}
+
+/* ── breaking, in the admin ───────────────────────────────────────────── */
+
+.tag.breaking-tag {
+  color: light-dark(#c0261c, #ff8a7a);
+  border-color: color-mix(
+    in oklab,
+    light-dark(#c0261c, #ff8a7a) 45%,
+    var(--bg)
+  );
+}
+
+/* A measurement the owner may overrule, so it is not styled as an error. */
+.notice.warn {
+  border-inline-start-color: var(--flash);
+}
+
+.notice.warn ul {
+  margin: 0.5rem 0 0.6rem;
+  padding-inline-start: 1.1rem;
+}
+
+.notice.warn li {
+  margin-bottom: 0.25rem;
+}
+
+.notice.warn .hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}

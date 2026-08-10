@@ -1,0 +1,875 @@
+<script server>
+  import {
+    ACCEPTED,
+    LOGO,
+    LOGO_DARK,
+    exists,
+    MAX_BYTES,
+    stamp,
+    remove as removeLogo,
+    write,
+  } from "../../data/assets.js";
+  import {
+    DEFAULTS,
+    FLAGS,
+    all as readSettings,
+    save,
+  } from "../../data/settings.js";
+  import { audit } from "../../lib/contrast.js";
+  import { STACKS } from "../../lib/fonts.js";
+  import { member, turnAway } from "../../lib/guard.js";
+
+  export const prerender = false;
+
+  // `Intl.supportedValuesOf` is in every runtime this app targets. A list beats
+  // a free-text box: a mistyped zone is a site whose days are grouped wrongly
+  // and nothing says why.
+  const ZONES = Intl.supportedValuesOf("timeZone");
+
+  /** The text and number inputs on this form, by name. */
+  const FIELDS = [
+    "title",
+    "tagline",
+    "timezone",
+    "locale",
+    "themeMode",
+    "bgLight",
+    "inkLight",
+    "linkLight",
+    "bgDark",
+    "inkDark",
+    "linkDark",
+    "fontHeadline",
+    "fontInterface",
+    "density",
+    "perPage",
+    "breakingHours",
+  ];
+
+  export default async ({ action, url }) => {
+    /** @type {Record<string, string>} */
+    const errors = action?.errors ?? {};
+    const asked = new URL(url).searchParams;
+    const site = await readSettings();
+
+    return {
+      site,
+      zones: ZONES,
+      stacks: STACKS,
+      hasLogo: await exists(LOGO),
+      hasLogoDark: await exists(LOGO_DARK),
+      // The previews are cached for a year like every other request for them,
+      // so they need the same version query the masthead uses. Without it a
+      // replaced logo keeps showing the old one right where you went to check
+      // that it changed.
+      // Measured, not guessed. Every color here is the owner's to choose, which
+      // is the feature — and it means a pair nobody can read is one click away.
+      // This says so; it does not refuse. A masthead color that lands just
+      // under the bar is the owner's call to make.
+      contrast: audit(site),
+      logoStamp: (await stamp(LOGO)) ?? '',
+      logoDarkStamp: (await stamp(LOGO_DARK)) ?? '',
+      errors,
+      // Six of these fields are color wells with no room for a message under
+      // them, and a form that refuses silently is worse than one that refuses
+      // loudly. Everything that went wrong is listed once, at the top.
+      complaints: Object.values(errors),
+      saved: asked.has("saved"),
+      // Every success redirects, so a notice is always read off the URL rather
+      // than off the action.
+      notice: asked.has("logo")
+        ? "The logo was replaced."
+        : asked.has("removed")
+          ? "The logo is gone. The site name is shown instead."
+          : asked.has("colors")
+            ? "The colors are back to what they started as."
+            : null,
+      maxKb: Math.round(MAX_BYTES / 1024),
+      accepts: ACCEPTED.join(","),
+      defaults: DEFAULTS,
+    };
+  };
+
+  export const POST = async (ctx) => {
+    // An action runs before the layout guard — see app/lib/guard.js.
+    if (!(await member(ctx))) return turnAway(ctx);
+
+    const { request, revalidateTag } = ctx;
+    // The logo arrives as multipart on the same form, so this is read once and
+    // both halves come out of it.
+    const form = await request.formData();
+    const intent = String(form.get("intent") ?? "save");
+
+    if (intent === "reset-colors") {
+      // Only the six. Fonts, density and the rest of the form are left where
+      // they are: "reset colors" that also reset the typography would be a
+      // different button.
+      await save({
+        bgLight: DEFAULTS.bgLight,
+        inkLight: DEFAULTS.inkLight,
+        linkLight: DEFAULTS.linkLight,
+        bgDark: DEFAULTS.bgDark,
+        inkDark: DEFAULTS.inkDark,
+        linkDark: DEFAULTS.linkDark,
+      });
+      revalidateTag("articles");
+      // The fragment is why this needs no script: a redirect can say where to
+      // land, and the browser scrolls there itself. Without it the page comes
+      // back at the top and you hunt for the section you were working in.
+      return Response.redirect(
+        new URL("/admin/settings?colors=1#colors", ctx.url),
+        303,
+      );
+    }
+
+    if (intent === "remove-logo" || intent === "remove-logo-dark") {
+      await removeLogo(intent === "remove-logo-dark" ? LOGO_DARK : LOGO);
+      revalidateTag("articles");
+      return Response.redirect(
+        new URL("/admin/settings?removed=1#logo", ctx.url),
+        303,
+      );
+    }
+
+    // Only the fields this submission actually carried. `save` validates every
+    // key it is given, so passing an absent one as null would refuse the form
+    // over a field nobody touched.
+    /** @type {Record<string, unknown>} */
+    const patch = {};
+    for (const name of FIELDS) {
+      if (form.has(name)) patch[name] = form.get(name);
+    }
+    if ("perPage" in patch) patch.perPage = Number(patch.perPage);
+
+    // An unticked checkbox sends nothing at all, so the markup pairs it with a
+    // hidden field of the same name carrying `0`. The form then always states
+    // the value: `['0']` unticked, `['0', '1']` ticked.
+    //
+    // Reading absence as false instead — which this did, keyed on `title` being
+    // present as a proxy for "the whole form came" — meant any POST that
+    // mentioned the title and not the checkbox quietly turned day headings off.
+    for (const flag of FLAGS) {
+      if (form.has(flag)) patch[flag] = form.getAll(flag).includes("1");
+    }
+
+    // Validated first, and nothing is written when anything failed — the logo
+    // included. Half-applying a form is worse than refusing it: the page comes
+    // back looking saved, with one field quietly ignored.
+    const result = await save(patch);
+
+    if (!result.ok) return { errors: result.errors, saved: false };
+
+    let notice = null;
+
+    // Both artworks come off the same submission. The second is optional and
+    // most saves carry neither.
+    for (const [field, name] of [
+      ["logo", LOGO],
+      ["logoDark", LOGO_DARK],
+    ]) {
+      const upload = form.get(field);
+
+      // An empty file input still submits a File, with size 0. That is "no file
+      // chosen", not "an empty file", and it must not clear what is there.
+      if (
+        !upload ||
+        typeof upload !== "object" ||
+        !("size" in upload) ||
+        upload.size === 0
+      ) {
+        continue;
+      }
+
+      const written = await write({
+        name,
+        mime: upload.type,
+        bytes: new Uint8Array(await upload.arrayBuffer()),
+      });
+
+      if (!written.ok) return { errors: { [field]: written.error }, saved: false };
+      notice = "The logo was replaced.";
+    }
+
+    // The masthead is in the layout, so it is part of every cached page.
+    revalidateTag("articles");
+
+    // Post/Redirect/Get. See the note in admin/index.html.
+    return Response.redirect(
+      new URL(`/admin/settings?saved=1${notice ? "&logo=1#logo" : ""}`, ctx.url),
+      303,
+    );
+  };
+</script>
+
+<title>Settings</title>
+
+<div class="sheet">
+  <h1>Settings</h1>
+  <p class="lede">How the site reads and how it looks.</p>
+
+  <p class="notice good" if="saved" role="status">Saved.</p>
+  <p class="notice good" if="notice" role="status">${notice}</p>
+
+  <div class="notice bad" if="complaints.length" role="alert">
+    <p><strong>Nothing was saved.</strong></p>
+    <ul>
+      <li each="complaint of complaints">${complaint}</li>
+    </ul>
+  </div>
+
+  <form id="settings" method="post" enctype="multipart/form-data">
+    <h2>The site</h2>
+
+    <label class="field" for="title">
+      <span>Name</span>
+      <input
+        id="title"
+        name="title"
+        type="text"
+        value="${site.title}"
+        maxlength="80"
+        aria-invalid="${errors.title ? 'true' : 'false'}"
+        required
+      />
+      <span class="hint">The masthead, and the browser tab.</span>
+      <strong class="error" if="errors.title">${errors.title}</strong>
+    </label>
+
+    <label class="field" for="tagline">
+      <span>Tagline</span>
+      <input
+        id="tagline"
+        name="tagline"
+        type="text"
+        value="${site.tagline}"
+        maxlength="160"
+        aria-invalid="${errors.tagline ? 'true' : 'false'}"
+      />
+      <span class="hint">Optional. Sits under the name.</span>
+      <strong class="error" if="errors.tagline">${errors.tagline}</strong>
+    </label>
+
+    <div class="row">
+      <label class="field" for="timezone">
+        <span>Time zone</span>
+        <span class="select">
+          <select
+            id="timezone"
+            name="timezone"
+            aria-describedby="timezone-hint"
+          >
+            <option
+              each="zone of zones"
+              value="${zone}"
+              selected="${zone === site.timezone}"
+            >
+              ${zone}
+            </option>
+          </select>
+        </span>
+        <span class="hint" id="timezone-hint"
+          >Decides where one day ends and the next begins.</span
+        >
+        <strong class="error" if="errors.timezone">${errors.timezone}</strong>
+      </label>
+
+      <label class="field" for="locale">
+        <span>Language tag</span>
+        <input
+          id="locale"
+          name="locale"
+          type="text"
+          value="${site.locale}"
+          aria-invalid="${errors.locale ? 'true' : 'false'}"
+        />
+        <span class="hint"
+          >How a date is spelled. <code>en-US</code>, <code>fr-FR</code>,
+          <code>ar-LB</code>.</span
+        >
+        <strong class="error" if="errors.locale">${errors.locale}</strong>
+      </label>
+    </div>
+
+    <h2>The page</h2>
+
+    <label class="checkbox" for="dayHeadings">
+      <!-- An unticked checkbox sends nothing. This makes the form say `0`
+           rather than say nothing, so the server never has to read absence. -->
+      <input type="hidden" name="dayHeadings" value="0" />
+      <input
+        id="dayHeadings"
+        name="dayHeadings"
+        type="checkbox"
+        value="1"
+        checked="${site.dayHeadings}"
+      />
+      <span>Group the headlines under a heading for each day</span>
+    </label>
+
+    <label class="checkbox" for="showSource">
+      <input type="hidden" name="showSource" value="0" />
+      <input
+        id="showSource"
+        name="showSource"
+        type="checkbox"
+        value="1"
+        checked="${site.showSource}"
+      />
+      <span>Show the source after each headline</span>
+    </label>
+
+    <label class="checkbox" for="showTime">
+      <input type="hidden" name="showTime" value="0" />
+      <input
+        id="showTime"
+        name="showTime"
+        type="checkbox"
+        value="1"
+        checked="${site.showTime}"
+      />
+      <span> Show the time each story is dated</span>
+    </label>
+
+    <label class="checkbox" for="rules">
+      <input type="hidden" name="rules" value="0" />
+      <input
+        id="rules"
+        name="rules"
+        type="checkbox"
+        value="1"
+        checked="${site.rules}"
+      />
+      <span>Draw a line between headlines</span>
+    </label>
+
+    <div class="row">
+      <label class="field" for="density">
+        <span>Reading density</span>
+        <span class="select">
+          <select
+            id="density"
+            name="density"
+            aria-invalid="${errors.density ? 'true' : 'false'}"
+          >
+            <option value="compact" selected="${site.density === 'compact'}">
+              Compact
+            </option>
+            <option value="normal" selected="${site.density === 'normal'}">
+              Normal
+            </option>
+            <option value="relaxed" selected="${site.density === 'relaxed'}">
+              Relaxed
+            </option>
+          </select>
+        </span>
+        <span class="hint"
+          >The line height and the space around each headline.</span
+        >
+        <strong class="error" if="errors.density">${errors.density}</strong>
+      </label>
+
+      <label class="field" for="perPage">
+        <span>Headlines per page</span>
+        <input
+          id="perPage"
+          name="perPage"
+          type="number"
+          min="5"
+          max="500"
+          value="${site.perPage}"
+          aria-invalid="${errors.perPage ? 'true' : 'false'}"
+        />
+        <strong class="error" if="errors.perPage">${errors.perPage}</strong>
+      </label>
+
+      <label class="field" for="themeMode">
+        <span>Light/Dark mode</span>
+        <span class="select">
+          <select id="themeMode" name="themeMode" aria-describedby="theme-hint">
+            <option value="auto" selected="${site.themeMode === 'auto'}">
+              Follow the reader's setting
+            </option>
+            <option value="light" selected="${site.themeMode === 'light'}">
+              Always light
+            </option>
+            <option value="dark" selected="${site.themeMode === 'dark'}">
+              Always dark
+            </option>
+          </select>
+        </span>
+      </label>
+    </div>
+
+    <h2>Fonts</h2>
+
+    <p class="lede">
+      Faces already on the reader's machine, from
+      <a href="https://modernfontstacks.com/" rel="noopener"
+        >Modern Font Stacks</a
+      >. Nothing is downloaded, so nothing blocks the page.
+    </p>
+
+    <div class="row">
+      <label class="field" for="fontHeadline">
+        <span>Headlines</span>
+        <span class="select">
+          <select
+            id="fontHeadline"
+            name="fontHeadline"
+            aria-invalid="${errors.fontHeadline ? 'true' : 'false'}"
+          >
+            <option
+              each="stack of stacks"
+              value="${stack.id}"
+              selected="${stack.id === site.fontHeadline}"
+              style="font-family: ${stack.css}"
+            >
+              ${stack.name}
+            </option>
+          </select>
+        </span>
+        <span class="hint">The masthead and every headline.</span>
+        <strong class="error" if="errors.fontHeadline"
+          >${errors.fontHeadline}</strong
+        >
+      </label>
+
+      <label class="field" for="fontInterface">
+        <span>Labels and dates</span>
+        <span class="select">
+          <select
+            id="fontInterface"
+            name="fontInterface"
+            aria-invalid="${errors.fontInterface ? 'true' : 'false'}"
+          >
+            <option
+              each="stack of stacks"
+              value="${stack.id}"
+              selected="${stack.id === site.fontInterface}"
+              style="font-family: ${stack.css}"
+            >
+              ${stack.name}
+            </option>
+          </select>
+        </span>
+        <span class="hint">Day headings, sources, times, and this admin.</span>
+        <strong class="error" if="errors.fontInterface"
+          >${errors.fontInterface}</strong
+        >
+      </label>
+    </div>
+
+    <!-- The preview is the site's own markup and the site's own classes, so it
+         is the thing itself rather than a drawing of it: the same day heading,
+         the same headline row, the same pager. It sits between the two controls
+         that change it.
+
+         Every value in it is a token — `var(--font-head)`, `var(--bg)` — never
+         a literal. That is what lets one script write one custom property and
+         have all of this follow. A literal font-family here is what made the
+         headline sit still while the select changed. -->
+    <div class="preview" aria-label="Preview">
+      <p class="day-heading"><time>Monday, August 9, 2026</time></p>
+
+      <ul class="headlines">
+        <li>
+          <span class="sample">Council votes to keep the ferry running</span>
+          <span class="source" hidden="${!site.showSource}">The Standard</span>
+          <time class="at" hidden="${!site.showTime}">06:47</time>
+        </li>
+        <li>
+          <span class="sample"
+            >Rain returns after the driest July on record</span
+          >
+          <span class="source" hidden="${!site.showSource}">Met Office</span>
+          <time class="at" hidden="${!site.showTime}">03:12</time>
+        </li>
+      </ul>
+
+      <p class="pager">
+        <span class="where">Page 1 of 3</span>
+        <a href="#preview-sample">Older</a>
+      </p>
+    </div>
+
+    <label class="checkbox" for="credit">
+      <input type="hidden" name="credit" value="0" />
+      <input id="credit" name="credit" type="checkbox" value="1" checked="${site.credit}" />
+      <span>
+        Show “Powered by Whispers” in the footer. The personal license asks you
+        to keep this; the commercial one does not. Nothing here checks — there
+        is no key to enter and nothing counting installs, so this is your call
+        to make honestly.
+      </span>
+    </label>
+
+    <h2 id="breaking">Breaking</h2>
+
+    <p class="lede">
+      A breaking story sits above the day headings in the breaking color. It
+      stops being breaking on its own, which is the point: a BREAKING banner
+      that is three days old costs you every future one.
+    </p>
+
+    <div class="row">
+      <label class="field" for="breakingHours">
+        <span>Stops breaking after</span>
+        <input
+          id="breakingHours"
+          name="breakingHours"
+          type="number"
+          min="0"
+          max="720"
+          value="${site.breakingHours}"
+          aria-invalid="${Boolean(errors.breakingHours) ? 'true' : 'false'}"
+        />
+        <span class="hint">Hours. 0 keeps it breaking until you unmark it.</span>
+        <strong class="error" if="errors.breakingHours">${errors.breakingHours}</strong>
+      </label>
+      <div></div>
+    </div>
+
+    <h2 id="colors">Colors</h2>
+
+    <div class="notice warn" if="contrast.length" role="status">
+      <p>
+        <strong>Some of these are hard to read.</strong> Measured with
+        <a href="https://git.apcacontrast.com" rel="noopener">APCA</a>, which
+        accounts for which way round the text is — the same two colors score
+        differently as a light theme and a dark one.
+      </p>
+      <ul>
+        <li each="problem of contrast">
+          <b>${problem.where}:</b> ${problem.what} — ${problem.lc} where
+          ${problem.need} is the floor.
+        </li>
+      </ul>
+      <p class="hint">
+        Saved anyway if you want them — this is a measurement, not a rule. If
+        you did not choose these, <a href="#colors">Reset colors to default</a>
+        below puts back a palette that passes: a saved color stays where it is
+        when the default it came from changes, which is right, and does mean an
+        old default can outlive its correction.
+      </p>
+    </div>
+
+    <p class="lede">
+      Both sets are stored whichever mode is chosen, so switching back does not
+      lose them.
+    </p>
+
+    <!-- Two columns, so the pair that has to work together is read across
+         rather than hunted for. A fieldset per column, because "Background"
+         appears twice and the legend is what tells a screen reader which one
+         it just landed on. -->
+    <div class="schemes">
+      <fieldset class="scheme">
+        <legend>Light</legend>
+
+        <label class="swatch" for="bgLight">
+          <input
+            id="bgLight"
+            name="bgLight"
+            type="color"
+            value="${site.bgLight}"
+            aria-invalid="${errors.bgLight ? 'true' : 'false'}"
+          />
+          <span>Background</span>
+        </label>
+        <label class="swatch" for="inkLight">
+          <input
+            id="inkLight"
+            name="inkLight"
+            type="color"
+            value="${site.inkLight}"
+            aria-invalid="${errors.inkLight ? 'true' : 'false'}"
+          />
+          <span>Text</span>
+        </label>
+        <label class="swatch" for="linkLight">
+          <input
+            id="linkLight"
+            name="linkLight"
+            type="color"
+            value="${site.linkLight}"
+            aria-invalid="${errors.linkLight ? 'true' : 'false'}"
+          />
+          <span>Links</span>
+        </label>
+        <label class="swatch" for="breakingLight">
+          <input
+            id="breakingLight"
+            name="breakingLight"
+            type="color"
+            value="${site.breakingLight}"
+            aria-invalid="${errors.breakingLight ? 'true' : 'false'}"
+          />
+          <span>Breaking</span>
+        </label>
+      </fieldset>
+
+      <fieldset class="scheme">
+        <legend>Dark</legend>
+
+        <label class="swatch" for="bgDark">
+          <input
+            id="bgDark"
+            name="bgDark"
+            type="color"
+            value="${site.bgDark}"
+            aria-invalid="${errors.bgDark ? 'true' : 'false'}"
+          />
+          <span>Background</span>
+        </label>
+        <label class="swatch" for="inkDark">
+          <input
+            id="inkDark"
+            name="inkDark"
+            type="color"
+            value="${site.inkDark}"
+            aria-invalid="${errors.inkDark ? 'true' : 'false'}"
+          />
+          <span>Text</span>
+        </label>
+        <label class="swatch" for="linkDark">
+          <input
+            id="linkDark"
+            name="linkDark"
+            type="color"
+            value="${site.linkDark}"
+            aria-invalid="${errors.linkDark ? 'true' : 'false'}"
+          />
+          <span>Links</span>
+        </label>
+        <label class="swatch" for="breakingDark">
+          <input
+            id="breakingDark"
+            name="breakingDark"
+            type="color"
+            value="${site.breakingDark}"
+            aria-invalid="${errors.breakingDark ? 'true' : 'false'}"
+          />
+          <span>Breaking</span>
+        </label>
+      </fieldset>
+    </div>
+
+    <div class="actions">
+      <button type="submit" name="intent" value="reset-colors" class="quiet">
+        Reset colors to default
+      </button>
+    </div>
+
+  </form>
+
+  <!-- The logo section sits outside the settings form, and its two file inputs
+       reach back into it with `form="settings"`. That is the whole reason it is
+       out here: a Remove is a `confirm-button`, a `confirm-button` carries its
+       own <form>, and a form inside a form is not markup — so the alternative
+       was the removes stranded at the bottom of the page, a long way from the
+       thing they remove.
+
+       The `form` attribute costs nothing and keeps Save doing what it did. -->
+  <h2 id="logo">Logo</h2>
+
+  <p class="lede">
+    Two artworks, and the second is optional. What matters is the background
+    each is drawn <em>for</em>, not the color of the artwork itself: a logo in
+    black ink is the one for a light page.
+  </p>
+
+  <div class="logos">
+    <div class="logo-slot">
+      <p class="swatch-title">For a light page</p>
+      <!-- Shown on the ground it is for, rather than on whatever the admin's
+           own theme happens to be. That is what makes a file in the wrong slot
+           obvious at a glance instead of on somebody else's screen. -->
+      <div class="logo-ground light">
+        <img if="hasLogo" src="/logo?v=${logoStamp}" alt="" class="logo" />
+        <span else class="none">Nothing uploaded</span>
+      </div>
+
+      <label class="field" for="logoFile">
+        <span class="hint">Usually the dark version of your mark. Up to ${maxKb} KB.</span>
+        <input
+          id="logoFile"
+          form="settings"
+          name="logo"
+          type="file"
+          accept="${accepts}"
+          aria-invalid="${errors.logo ? 'true' : 'false'}"
+        />
+        <strong class="error" if="errors.logo">${errors.logo}</strong>
+      </label>
+
+      <confirm-button
+        if="hasLogo"
+        token="logo"
+        label="Remove"
+        heading="Remove the logo?"
+        note="The site's name is set in type instead. Putting it back means uploading the file again."
+        confirm="Remove it"
+        cancel="Keep it"
+        value="remove-logo"
+      ></confirm-button>
+    </div>
+
+    <div class="logo-slot">
+      <p class="swatch-title">For a dark page</p>
+      <div class="logo-ground dark">
+        <img if="hasLogoDark" src="/logo?dark&amp;v=${logoDarkStamp}" alt="" class="logo" />
+        <span else class="none">Falls back to the one beside it</span>
+      </div>
+
+      <label class="field" for="logoDarkFile">
+        <span class="hint">Usually the light version. Optional.</span>
+        <input
+          id="logoDarkFile"
+          form="settings"
+          name="logoDark"
+          type="file"
+          accept="${accepts}"
+          aria-invalid="${errors.logoDark ? 'true' : 'false'}"
+        />
+        <strong class="error" if="errors.logoDark">${errors.logoDark}</strong>
+      </label>
+
+      <confirm-button
+        if="hasLogoDark"
+        token="logo-dark"
+        label="Remove"
+        heading="Remove the dark logo?"
+        note="A dark page will show the other artwork instead."
+        confirm="Remove it"
+        cancel="Keep it"
+        value="remove-logo-dark"
+      ></confirm-button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button type="submit" form="settings" name="intent" value="save">Save settings</button>
+    <!-- Revealed by the script below, once something has been previewed. The
+         preview and the database disagree from that moment, and saying so is
+         cheaper than somebody navigating away and losing a palette. -->
+    <p class="preview-note" id="unsaved" hidden>Previewing. Nothing is saved yet.</p>
+  </div>
+</div>
+
+<!-- The only script in this app, and it is behind the sign-in.
+     The reader's page ships none: the theme, the fonts and the colors all
+     arrive as custom properties the server wrote, resolved before the first
+     paint. This is the admin, where a form ought to show you what it is about
+     to do, and there is no way to preview a color without running something.
+
+     It is an enhancement and nothing depends on it. With the script blocked the
+     page works exactly as it did: the preview shows what is saved, and Save
+     applies. It writes the same properties the layout writes, so the preview is
+     the real thing rather than an impression of it. -->
+<script>
+  const form = document.getElementById("settings");
+  const unsaved = document.getElementById("unsaved");
+  const page = document.documentElement;
+  const body = document.body;
+
+  /** The color wells, against the properties the layout sets on <body>. */
+  const COLORS = {
+    bgLight: "--bg-l",
+    inkLight: "--ink-l",
+    linkLight: "--link-l",
+    bgDark: "--bg-d",
+    inkDark: "--ink-d",
+    linkDark: "--link-d",
+  };
+
+  const FONTS = {
+    fontHeadline: "--font-head",
+    fontInterface: "--font-ui",
+  };
+
+  const touched = () => {
+    if (unsaved) unsaved.hidden = false;
+  };
+
+  const field = (name) => form?.elements.namedItem(name) ?? null;
+
+  for (const [name, property] of Object.entries(COLORS)) {
+    const input = field(name);
+    if (!(input instanceof HTMLInputElement)) continue;
+
+    // `input`, not `change`: a color well fires it while the picker is open, so
+    // the page follows the cursor round the wheel.
+    input.addEventListener("input", () => {
+      body.style.setProperty(property, input.value);
+      touched();
+    });
+  }
+
+  for (const [name, property] of Object.entries(FONTS)) {
+    const select = field(name);
+    if (!(select instanceof HTMLSelectElement)) continue;
+
+    select.addEventListener("change", () => {
+      // The stack is already on the option, put there so the dropdown draws
+      // each name in its own face. Reading it back means the fifteen stacks
+      // live in one file and are not restated in script.
+      const chosen = select.selectedOptions[0];
+      if (chosen) body.style.setProperty(property, chosen.style.fontFamily);
+      touched();
+    });
+  }
+
+  /** Density is two properties, the same pair the server writes together. */
+  const DENSITY = {
+    compact: ["1.2", "0.4rem"],
+    normal: ["1.35", "0.62rem"],
+    relaxed: ["1.5", "0.95rem"],
+  };
+
+  const density = field("density");
+  if (density instanceof HTMLSelectElement) {
+    density.addEventListener("change", () => {
+      const [leading, pad] = DENSITY[density.value] ?? DENSITY.normal;
+      body.style.setProperty("--leading", leading);
+      body.style.setProperty("--row-pad", pad);
+      touched();
+    });
+  }
+
+  const rules = field("rules");
+  if (rules instanceof HTMLInputElement) {
+    rules.addEventListener("change", () => {
+      body.style.setProperty("--headline-rule", rules.checked ? "1px" : "0");
+      touched();
+    });
+  }
+
+  // Source and time are markup on the real page — a headline with the source
+  // switched off does not render one, rather than rendering it and hiding it,
+  // so a screen reader is not read a line the page does not show. Inside the
+  // preview there is nothing to re-render, so these two are hidden instead.
+  for (const [name, selector] of [
+    ["showSource", ".preview .source"],
+    ["showTime", ".preview .at"],
+  ]) {
+    const box = field(name);
+    if (!(box instanceof HTMLInputElement)) continue;
+
+    box.addEventListener("change", () => {
+      for (const el of document.querySelectorAll(selector))
+        el.hidden = !box.checked;
+      touched();
+    });
+  }
+
+  const theme = field("themeMode");
+  if (theme instanceof HTMLSelectElement) {
+    theme.addEventListener("change", () => {
+      // The same value the server writes. `light dark` is what lets the
+      // browser follow the reader; naming one pins the site to it.
+      page.style.colorScheme =
+        theme.value === "auto" ? "light dark" : theme.value;
+      touched();
+    });
+  }
+</script>

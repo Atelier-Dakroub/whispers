@@ -1,0 +1,5 @@
+# What `wrangler dev` reads, standing in for the secrets you set with
+# `npx wrangler secret put <NAME>` on a deployed worker.
+COOKIE_SECRET=a-long-random-string-for-local-workerd
+SITE_URL=http://localhost:8787
+# GOOGLE_SAFE_BROWSING_API_KEY=

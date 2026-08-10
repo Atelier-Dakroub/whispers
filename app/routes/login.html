@@ -1,0 +1,113 @@
+<script server>
+  import { count, signIn } from '../data/members.js';
+  import { check, fail, keyFor, reset } from '../lib/throttle.js';
+
+  export const prerender = false;
+
+  const SESSION = {
+    httpOnly: true,
+    sameSite: /** @type {const} */ ('Lax'),
+    path: '/',
+    maxAge: 60 * 60 * 24 * 14,
+  };
+
+  /**
+   * A path this site owns, or the admin.
+   *
+   * `new URL(next, url)` on a value straight from a form is an open redirect:
+   * `//evil.example` and `https://evil.example` both resolve to another origin,
+   * and the visitor would arrive there having been sent by us.
+   */
+  const safeNext = (value) => {
+    const next = String(value ?? '');
+    return next.startsWith('/') && !next.startsWith('//') ? next : '/admin';
+  };
+
+  export default async ({ action, url }) => {
+    // Nobody has claimed this site yet, so there is nothing to sign in to.
+    if ((await count()) === 0) return Response.redirect(new URL('/setup', url), 303);
+
+    return {
+      error: action?.error ?? null,
+      email: action?.email ?? '',
+      next: safeNext(new URL(url).searchParams.get('next')),
+    };
+  };
+
+  export const POST = async ({ cookies, request, url }) => {
+    const form = await request.formData();
+    const email = String(form.get('email') ?? '');
+    const next = safeNext(form.get('next'));
+
+    const key = keyFor(request, email);
+    const gate = check(key);
+
+    if (!gate.allowed) {
+      return {
+        error: `Too many attempts. Try again in ${Math.ceil(gate.retryAfter / 60)} minutes.`,
+        email,
+      };
+    }
+
+    const member = await signIn(email, String(form.get('passphrase') ?? ''));
+
+    if (!member) {
+      fail(key);
+      // One message for both failures. A different answer for an unknown
+      // address than for a wrong passphrase tells whoever is asking which
+      // addresses have accounts here.
+      return { error: 'Those do not match an account.', email };
+    }
+
+    reset(key);
+
+    // Signed, so the browser can read the id and cannot invent one. Everything
+    // else about the member stays on the server.
+    await cookies.signed.set('session', member.id, SESSION);
+
+    return Response.redirect(new URL(next, url), 303);
+  };
+</script>
+
+<title>Sign in</title>
+<meta name="robots" content="noindex" />
+
+<div class="sheet">
+  <h1>Sign in</h1>
+  <p class="lede">For the people who post here.</p>
+
+  <p class="notice bad" if="error" role="alert">${error}</p>
+
+  <form method="post">
+    <input type="hidden" name="next" value="${next}" />
+
+    <label class="field" for="email">
+      <span>Email</span>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        value="${email}"
+        autocomplete="username"
+        autocapitalize="off"
+        spellcheck="false"
+        required
+      />
+    </label>
+
+    <label class="field" for="passphrase">
+      <span>Passphrase</span>
+      <input
+        id="passphrase"
+        name="passphrase"
+        type="password"
+        autocomplete="current-password"
+        required
+      />
+    </label>
+
+    <div class="actions">
+      <button type="submit">Sign in</button>
+    </div>
+  </form>
+</div>

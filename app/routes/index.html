@@ -1,0 +1,141 @@
+<script server>
+  import { breaking, published } from '../data/articles.js';
+  import { breakingCutoff } from '../data/settings.js';
+  import { byDay, timeOfDay } from '../lib/days.js';
+  import { fill, stringsFor } from '../lib/strings.js';
+
+  // The content changes when somebody edits it, so this page is never a file.
+  // It also reads a database that arrives as a binding on workerd, and a page
+  // that reads a binding has to say so — the build runs on a machine where no
+  // binding exists.
+  export const prerender = false;
+
+  // The middle ground between a file and a render per request: answered from
+  // the store for a minute, then refreshed behind whoever asks next. Every
+  // admin write calls `ctx.revalidateTag('articles')`, so an edit shows up at
+  // once rather than a minute later.
+  export const revalidate = { seconds: 60, tags: ['articles'] };
+
+  export default async ({ layout, url }) => {
+    const { site } = layout;
+    const asked = Number(new URL(url).searchParams.get('page') ?? '1');
+    const wanted = Number.isFinite(asked) ? asked : 1;
+
+    // One cutoff for both queries, so a story cannot fall between them and be
+    // shown twice or not at all.
+    const settled = breakingCutoff(site);
+
+    const { items, page, pages, total } = await published({
+      page: wanted,
+      perPage: site.perPage,
+      // Anything still breaking is in its own band above, so it is excluded
+      // here in SQL — which is what keeps the count and the page size exact.
+      settled,
+    });
+
+    // Only on the first page. A breaking band above page four is a band above
+    // the archive.
+    const urgent = wanted <= 1 ? await breaking(settled) : [];
+
+    const stamped = items.map((item) => ({
+      ...item,
+      // With no day heading above the list there is nothing else saying which
+      // day a story is from, so the stamp carries the date as well.
+      time: site.showTime
+        ? timeOfDay(item.publishedAt, { ...site, withDate: !site.dayHeadings })
+        : '',
+    }));
+
+    const s = stringsFor(site.locale);
+
+    return {
+      s,
+      urgent: urgent.map((item) => ({
+        ...item,
+        time: site.showTime
+          ? timeOfDay(item.publishedAt, { ...site, withDate: !site.dayHeadings })
+          : '',
+      })),
+      // Filled here rather than in the template: "of" lands somewhere different
+      // in almost every language, so the whole sentence is one string with two
+      // holes, and the numbers are written the way the locale writes numbers.
+      pageLabel: fill(s.pageOf, { page, pages }, site.locale),
+      title: site.title,
+      tagline: site.tagline,
+      headings: site.dayHeadings,
+      showSource: site.showSource,
+      days: byDay(stamped, site),
+      items: stamped,
+      page,
+      pages,
+      total,
+      older: page < pages ? `/?page=${page + 1}` : null,
+      newer: page > 1 ? (page === 2 ? '/' : `/?page=${page - 1}`) : null,
+    };
+  };
+</script>
+
+<title>${title}</title>
+<meta name="description" content="${tagline || title}" />
+<link rel="alternate" type="application/rss+xml" title="${title}" href="/feed.xml" />
+
+<!-- A directive on a tag hoisted into <head> is honored as of core 0.10.0.
+     Before that the `if` was dropped and both of these rendered on every page,
+     href and all, pointing at pages that did not exist. -->
+<link if="older" rel="next" href="${older}" />
+<link if="newer" rel="prev" href="${newer}" />
+
+<!-- A sentence and a link, not a sentence with a link inside it. A translator
+     cannot move an <a> that is buried in a string, and several languages need
+     to put it somewhere else. -->
+<!-- Above the day headings, because a breaking story is not "today", it is
+     "now". It leaves on its own once the window in the settings passes: the
+     column holds when it was marked, and the query compares that to a cutoff,
+     so nothing has to run to un-break it. -->
+<section class="breaking" if="urgent.length" aria-label="${s.breaking}">
+  <p class="breaking-label">${s.breaking}</p>
+  <ul class="headlines">
+    <li each="item of urgent" key="item.id">
+      <a href="${item.url}" rel="noopener">${item.headline}</a>
+      <span class="source" if="showSource && item.source">${item.source}</span>
+      <time class="at" if="item.time" datetime="${item.publishedAt}">${item.time}</time>
+    </li>
+  </ul>
+</section>
+
+<p class="empty" if="!total && !urgent.length">
+  ${s.empty} <a href="/login">${s.emptyInvite}</a>
+</p>
+
+<!-- Two shapes for one list, chosen by a setting. A day heading is a real
+     heading, so it is an <h2> and the list under it is its own <ul>: a screen
+     reader reads "Today, list of six items" rather than one list of forty. -->
+<div class="stack" else-if="headings">
+  <section class="day" each="day of days" key="day.key">
+    <h2 class="day-heading">
+      <time datetime="${day.iso}">${day.label}</time>
+    </h2>
+
+    <ul class="headlines">
+      <li each="item of day.items" key="item.id">
+        <a href="${item.url}" rel="noopener">${item.headline}</a>
+        <span class="source" if="showSource && item.source">${item.source}</span>
+        <time class="at" if="item.time" datetime="${item.publishedAt}">${item.time}</time>
+      </li>
+    </ul>
+  </section>
+</div>
+
+<ul class="headlines flat" else>
+  <li each="item of items" key="item.id">
+    <a href="${item.url}" rel="noopener">${item.headline}</a>
+    <span class="source" if="showSource && item.source">${item.source}</span>
+    <time class="at" if="item.time" datetime="${item.publishedAt}">${item.time}</time>
+  </li>
+</ul>
+
+<nav class="pager" if="pages > 1" aria-label="${s.morePages}">
+  <a if="newer" href="${newer}" rel="prev">${s.newer}</a>
+  <span class="where">${pageLabel}</span>
+  <a if="older" href="${older}" rel="next">${s.older}</a>
+</nav>

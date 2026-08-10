@@ -1,0 +1,54 @@
+<script server>
+  import { count, find } from '../../data/members.js';
+
+  // The guard, written once for everything below it.
+  //
+  // A layout loader that returns a Response answers the request, and nothing
+  // under it runs: not this layout's markup, and not the page's loader. So no
+  // page in admin/ checks anything, and forgetting to check is not a mistake
+  // that can be made here — adding a file to this directory puts it behind the
+  // guard.
+  //
+  // This is also the only layout that reads a cookie. The site's own layout
+  // does not, which is what keeps the reader's page cacheable: reading a cookie
+  // makes a page personal, and personal pages are neither cached nor written to
+  // a file.
+  export default async ({ cookies, request, route, url }) => {
+    // `ctx.request` is null while prerendering, and that is the only time it is.
+    // Nothing under admin/ is prerendered, but an error page rendered at build
+    // time can reach a layout, and reading a signed cookie with no secret and no
+    // visitor throws.
+    if (!request) return Response.redirect(new URL('/login', url), 303);
+
+    if ((await count()) === 0) return Response.redirect(new URL('/setup', url), 303);
+
+    const id = await cookies.signed.get('session');
+    const member = id ? await find(id) : null;
+
+    if (!member) {
+      // A session for a member who has since been removed lands here too, which
+      // is the point of one passphrase each: the row is gone, so the cookie
+      // stops meaning anything.
+      const next = new URL(url).pathname;
+      return Response.redirect(new URL(`/login?next=${encodeURIComponent(next)}`, url), 303);
+    }
+
+    return { member, path: route.path };
+  };
+</script>
+
+<meta name="robots" content="noindex" />
+
+<nav class="admin-bar" aria-label="Admin">
+  <a href="/admin" aria-current="${path === '/admin' ? 'page' : false}">Headlines</a>
+  <a href="/admin/settings" aria-current="${path === '/admin/settings' ? 'page' : false}">Settings</a>
+  <a href="/admin/people" aria-current="${path === '/admin/people' ? 'page' : false}">People</a>
+
+  <span class="who">${member.name}</span>
+
+  <form method="post" action="/sign-out">
+    <button type="submit">Sign out</button>
+  </form>
+</nav>
+
+<slot></slot>

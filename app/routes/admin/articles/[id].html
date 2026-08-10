@@ -1,0 +1,250 @@
+<script server>
+  import {
+    byId,
+    byUrl,
+    DRAFT,
+    PUBLISHED,
+    remove,
+    setBreaking,
+    update,
+  } from '../../../data/articles.js';
+  import { canonical, reputation } from '../../../data/link-check.js';
+  import { breakingCutoff, all as readSettings } from '../../../data/settings.js';
+  import { fromLocalInput, toLocalInput } from '../../../lib/days.js';
+  import { member, turnAway } from '../../../lib/guard.js';
+
+  export const prerender = false;
+
+  export default async ({ action, params, url }) => {
+    const article = await byId(params.id);
+    if (!article) return Response.redirect(new URL('/admin', url), 303);
+
+    const site = await readSettings();
+
+    return {
+      site,
+      article,
+      form: action?.form ?? {
+        headline: article.headline,
+        url: article.url,
+        source: article.source,
+        publishedAt: toLocalInput(article.publishedAt, site.timezone),
+      },
+      errors: /** @type {Record<string, string>} */ (action?.errors ?? {}),
+      saved: new URL(url).searchParams.has('saved'),
+      isDraft: article.status === DRAFT,
+      isBreaking: Boolean(article.breakingAt),
+      // Whether it is *still* breaking, which is not the same as whether it was
+      // marked: the window may have passed while nobody was looking.
+      stillBreaking: Boolean(article.breakingAt && article.breakingAt >= breakingCutoff(site)),
+    };
+  };
+
+  export const POST = async (ctx) => {
+    // An action runs before the layout guard — see app/lib/guard.js.
+    if (!(await member(ctx))) return turnAway(ctx);
+
+    const { params, request, revalidateTag, url } = ctx;
+    const article = await byId(params.id);
+    if (!article) return Response.redirect(new URL('/admin', url), 303);
+
+    const site = await readSettings();
+    const form = await request.formData();
+    const intent = String(form.get('intent') ?? 'save');
+
+    // HTML forms send GET and POST and nothing else, so the verb the page
+    // exports cannot be DELETE without a method-override middleware. One POST
+    // with an intent is fewer moving parts than that, and the guard above
+    // covers all of them equally.
+    if (intent === 'delete') {
+      await remove(article.id);
+      revalidateTag('articles');
+      return Response.redirect(new URL('/admin', url), 303);
+    }
+
+    if (intent === 'break' || intent === 'unbreak') {
+      await setBreaking(article.id, intent === 'break');
+      revalidateTag('articles');
+
+      return Response.redirect(new URL(`/admin/articles/${article.id}?saved=1`, url), 303);
+    }
+
+    if (intent === 'publish' || intent === 'unpublish') {
+      const status = intent === 'publish' ? PUBLISHED : DRAFT;
+      let flagReason = article.flagReason;
+
+      // Checked on the way out the door rather than only on the way in, so a
+      // draft written a month ago is not published on a month-old verdict.
+      if (intent === 'publish') {
+        const verdict = await reputation(article.url);
+        if (verdict.checked) flagReason = verdict.reason;
+      }
+
+      await update(article.id, { status, flagReason });
+      revalidateTag('articles');
+
+      return Response.redirect(new URL(`/admin/articles/${article.id}`, url), 303);
+    }
+
+    const headline = String(form.get('headline') ?? '').trim();
+    const source = String(form.get('source') ?? '').trim();
+    const typedUrl = String(form.get('url') ?? '');
+    const typedWhen = String(form.get('publishedAt') ?? '').trim();
+
+    const echo = { headline, url: typedUrl, source, publishedAt: typedWhen };
+
+    /** @type {Record<string, string>} */
+    const errors = {};
+
+    if (!headline) errors.headline = 'A headline is needed.';
+    else if (headline.length > 300) errors.headline = 'Keep it under 300 characters.';
+    if (source.length > 80) errors.source = 'Keep the source under 80 characters.';
+
+    const link = canonical(typedUrl);
+    if (!link.ok) errors.url = link.error;
+
+    const publishedAt = typedWhen ? fromLocalInput(typedWhen, site.timezone) : null;
+    if (!publishedAt) errors.publishedAt = 'That is not a date and time.';
+
+    if (link.ok) {
+      // Ignoring this row, so leaving the URL alone is not a duplicate of
+      // itself.
+      const clash = await byUrl(link.url, article.id);
+      if (clash) errors.url = `Already here, as “${clash.headline}”.`;
+    }
+
+    if (Object.keys(errors).length) return { errors, form: echo };
+
+    // Both were reported above. Restating them as a guard is what tells the type
+    // checker that `link.url` and `publishedAt` are set from here on; a list of
+    // errors collected across several fields cannot narrow on its own.
+    if (!link.ok || !publishedAt) return { errors, form: echo };
+
+    await update(article.id, { headline, url: link.url, source, publishedAt });
+    revalidateTag('articles');
+
+    // Post/Redirect/Get. See the note in admin/index.html.
+    return Response.redirect(new URL(`/admin/articles/${article.id}?saved=1`, url), 303);
+  };
+</script>
+
+<title>${article.headline}</title>
+
+<div class="sheet">
+  <p class="lede"><a href="/admin">← All headlines</a></p>
+
+  <h1>Edit</h1>
+
+  <p class="notice good" if="saved" role="status">Saved.</p>
+
+  <p class="notice good" if="isBreaking && stillBreaking" role="status">
+    Breaking, and above the day headings on the front page.
+  </p>
+
+  <p class="notice" if="isBreaking && !stillBreaking">
+    This was marked breaking, and the window has since passed — so it is back in
+    the list with everything else. Stop breaking to clear the mark.
+  </p>
+
+  <p class="notice bad" if="article.flagReason" role="alert">
+    ${article.flagReason} It is posted anyway — this is a note, not a block.
+  </p>
+
+  <form method="post" autocomplete="off">
+    <label class="field" for="headline">
+      <span>Headline</span>
+      <input
+        id="headline"
+        name="headline"
+        type="text"
+        value="${form.headline}"
+        maxlength="300"
+        aria-invalid="${errors.headline ? 'true' : 'false'}"
+        required
+      />
+      <strong class="error" if="errors.headline">${errors.headline}</strong>
+    </label>
+
+    <label class="field" for="url">
+      <span>Link</span>
+      <input
+        id="url"
+        name="url"
+        type="text"
+        inputmode="url"
+        value="${form.url}"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-invalid="${errors.url ? 'true' : 'false'}"
+        required
+      />
+      <strong class="error" if="errors.url">${errors.url}</strong>
+    </label>
+
+    <div class="row">
+      <label class="field" for="source">
+        <span>Source</span>
+        <input
+          id="source"
+          name="source"
+          type="text"
+          value="${form.source}"
+          maxlength="80"
+          aria-invalid="${errors.source ? 'true' : 'false'}"
+        />
+        <strong class="error" if="errors.source">${errors.source}</strong>
+      </label>
+
+      <label class="field" for="publishedAt">
+        <span>Dated</span>
+        <input
+          id="publishedAt"
+          name="publishedAt"
+          type="datetime-local"
+          value="${form.publishedAt}"
+          aria-invalid="${errors.publishedAt ? 'true' : 'false'}"
+        />
+        <span class="hint">${site.timezone}</span>
+        <strong class="error" if="errors.publishedAt">${errors.publishedAt}</strong>
+      </label>
+    </div>
+
+    <div class="actions">
+      <button type="submit" name="intent" value="save">Save</button>
+
+      <button type="submit" name="intent" value="publish" class="quiet" if="isDraft">
+        Publish
+      </button>
+      <button type="submit" name="intent" value="unpublish" class="quiet" else>
+        Make it a draft
+      </button>
+
+      <button type="submit" name="intent" value="unbreak" class="quiet" if="isBreaking">
+        Stop breaking
+      </button>
+      <button type="submit" name="intent" value="break" class="quiet" else>
+        Mark as breaking
+      </button>
+    </div>
+  </form>
+
+  <h2>Remove</h2>
+
+  <p class="lede">
+    The link stops appearing on the site and in the feed.
+  </p>
+
+  <!-- The confirmation is a <dialog> opened by `command`/`commandfor`, which is
+       the platform's own invoker. No script, so no CSP hash, and the browser
+       supplies the focus trap, Escape, the backdrop and the inert page. -->
+  <confirm-button
+    token="${article.id}"
+    label="Delete this headline"
+    heading="Delete this headline?"
+    detail="${article.headline}"
+    note="This cannot be undone. The link stops appearing on the site and in the feed."
+    confirm="Delete it"
+    cancel="Keep it"
+    value="delete"
+  ></confirm-button>
+</div>

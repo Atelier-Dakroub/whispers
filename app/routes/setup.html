@@ -1,0 +1,140 @@
+<script server>
+  import { add, count, signIn } from '../data/members.js';
+
+  export const prerender = false;
+
+  // Claiming the site. This page exists only while there are no members, and
+  // the first person to fill it in becomes one.
+  //
+  // The alternative — a first account seeded from environment variables — reads
+  // fine in a README and badly in practice for something people buy: it means
+  // generating a hash on a command line before the app will let you in. Here,
+  // the window closes the moment somebody walks through it.
+  //
+  // The race worth naming: two people loading this at once could both submit,
+  // and the second gets "already claimed" from the check below rather than a
+  // second account. Both are refused after the first insert lands.
+
+  export default async ({ action, url }) => {
+    if ((await count()) > 0) return Response.redirect(new URL('/login', url), 303);
+
+    return {
+      errors: action?.errors ?? {},
+      email: action?.email ?? '',
+      name: action?.name ?? '',
+    };
+  };
+
+  export const POST = async ({ cookies, request, url }) => {
+    if ((await count()) > 0) return Response.redirect(new URL('/login', url), 303);
+
+    const form = await request.formData();
+    const email = String(form.get('email') ?? '');
+    const name = String(form.get('name') ?? '');
+    const passphrase = String(form.get('passphrase') ?? '');
+    const again = String(form.get('again') ?? '');
+
+    if (passphrase !== again) {
+      return { errors: { again: 'The two passphrases are different.' }, email, name };
+    }
+
+    const result = await add({ email, name, passphrase });
+    if (!result.ok) return { errors: result.errors, email, name };
+
+    // Straight in, rather than bouncing to a sign-in form they would fill with
+    // what they just typed.
+    const member = await signIn(email, passphrase);
+    if (member) {
+      await cookies.signed.set('session', member.id, {
+        httpOnly: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 14,
+      });
+    }
+
+    return Response.redirect(new URL('/admin/settings', url), 303);
+  };
+</script>
+
+<title>Set up this site</title>
+<meta name="robots" content="noindex" />
+
+<div class="sheet">
+  <h1>Set up this site</h1>
+  <p class="lede">
+    Nobody has claimed it yet. Make the first account, and this page goes away.
+  </p>
+
+  <p class="notice bad" if="errors._" role="alert">${errors._}</p>
+
+  <form method="post">
+    <label class="field" for="name">
+      <span>Your name</span>
+      <input
+        id="name"
+        name="name"
+        type="text"
+        value="${name}"
+        autocomplete="name"
+        aria-invalid="${errors.name ? 'true' : 'false'}"
+        aria-describedby="${errors.name ? 'name-error' : ''}"
+        required
+      />
+      <strong class="error" id="name-error" if="errors.name">${errors.name}</strong>
+    </label>
+
+    <label class="field" for="email">
+      <span>Email</span>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        value="${email}"
+        autocomplete="username"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-invalid="${errors.email ? 'true' : 'false'}"
+        aria-describedby="${errors.email ? 'email-error' : ''}"
+        required
+      />
+      <strong class="error" id="email-error" if="errors.email">${errors.email}</strong>
+    </label>
+
+    <label class="field" for="passphrase">
+      <span>Passphrase</span>
+      <input
+        id="passphrase"
+        name="passphrase"
+        type="password"
+        autocomplete="new-password"
+        minlength="12"
+        aria-invalid="${errors.passphrase ? 'true' : 'false'}"
+        aria-describedby="passphrase-hint"
+        required
+      />
+      <span class="hint" id="passphrase-hint">
+        At least 12 characters. Four unrelated words beats one clever word.
+      </span>
+      <strong class="error" if="errors.passphrase">${errors.passphrase}</strong>
+    </label>
+
+    <label class="field" for="again">
+      <span>Passphrase again</span>
+      <input
+        id="again"
+        name="again"
+        type="password"
+        autocomplete="new-password"
+        aria-invalid="${errors.again ? 'true' : 'false'}"
+        aria-describedby="${errors.again ? 'again-error' : ''}"
+        required
+      />
+      <strong class="error" id="again-error" if="errors.again">${errors.again}</strong>
+    </label>
+
+    <div class="actions">
+      <button type="submit">Claim this site</button>
+    </div>
+  </form>
+</div>

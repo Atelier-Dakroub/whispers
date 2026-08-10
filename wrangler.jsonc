@@ -1,0 +1,38 @@
+{
+  "name": "whispers-news",
+  "main": "worker.js",
+  "compatibility_date": "2026-01-01",
+
+  // `process.env` exists on workerd only with this. `app/data/link-check.js`
+  // and `app/server.js` read it for the two optional settings that are not in
+  // the database, and `worker.js` copies them across from `env`.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // There is no JSON module type, so the route manifest arrives as text and the
+  // adapter parses it. `fallthrough` matters: without it this rule replaces the
+  // default text rule for .txt/.html/.sql rather than adding to it.
+  "rules": [{ "type": "Text", "globs": ["**/routes.json"], "fallthrough": true }],
+
+  "observability": { "enabled": true },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "whispers",
+      // From `npx wrangler d1 create whispers`. Paste the id it prints here.
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      // The same directory drizzle-kit writes to, so `wrangler d1 migrations
+      // apply` and `npm run db:migrate` run the same SQL. One set of files.
+      "migrations_dir": "drizzle/sqlite"
+    }
+  ]
+
+  // Set the secret out of band rather than here, because this file is committed:
+  //   npx wrangler secret put COOKIE_SECRET
+  //   npx wrangler secret put GOOGLE_SAFE_BROWSING_API_KEY   (optional)
+  //
+  // And the address, once there is one:
+  // "routes": [{ "pattern": "whispers.news", "custom_domain": true }]
+  //
+  // `wrangler dev` reads .dev.vars for the same names.
+}

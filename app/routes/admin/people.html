@@ -1,0 +1,160 @@
+<script server>
+  import { add, list, remove, resetPassphrase } from '../../data/members.js';
+  import { member as signedIn, turnAway } from '../../lib/guard.js';
+
+  export const prerender = false;
+
+  export default async ({ action, layout }) => ({
+    people: await list(),
+    me: layout.member,
+    errors: /** @type {Record<string, string>} */ (action?.errors ?? {}),
+    form: /** @type {{ email: string, name: string }} */ (action?.form ?? { email: '', name: '' }),
+    // Shown once and never again: it is not stored anywhere in a readable form,
+    // so there is no second chance to look it up. That is the point.
+    secret: action?.secret ?? null,
+    secretFor: action?.secretFor ?? null,
+    notice: action?.notice ?? null,
+  });
+
+  export const POST = async (ctx) => {
+    // An action runs before the layout guard — see app/lib/guard.js.
+    const me = await signedIn(ctx);
+    if (!me) return turnAway(ctx);
+
+    const form = await ctx.request.formData();
+    const intent = String(form.get('intent') ?? 'add');
+
+    if (intent === 'remove') {
+      const id = String(form.get('id') ?? '');
+
+      if (id === me.id) {
+        return { errors: { _: 'Removing yourself would lock you out. Ask somebody else to.' } };
+      }
+
+      const result = await remove(id);
+      if (!result.ok) return { errors: { _: result.error } };
+
+      return { notice: 'Removed. Their passphrase no longer opens anything.' };
+    }
+
+    if (intent === 'reset') {
+      const id = String(form.get('id') ?? '');
+      const secret = await resetPassphrase(id);
+      if (!secret) return { errors: { _: 'No such person.' } };
+
+      const who = (await list()).find((person) => person.id === id);
+
+      return { secret, secretFor: who?.name ?? 'them' };
+    }
+
+    const email = String(form.get('email') ?? '');
+    const name = String(form.get('name') ?? '');
+
+    const result = await add({ email, name });
+    if (!result.ok) return { errors: result.errors, form: { email, name } };
+
+    return { secret: result.passphrase, secretFor: result.member.name };
+  };
+</script>
+
+<title>People</title>
+
+<div class="sheet">
+  <h1>People</h1>
+  <p class="lede">
+    Everyone here can post, edit and change the settings. Each has their own
+    passphrase, so removing somebody locks them out on its own — nobody else has
+    to change anything.
+  </p>
+
+  <p class="notice bad" if="errors._" role="alert">${errors._}</p>
+  <p class="notice good" if="notice" role="status">${notice}</p>
+
+  <div class="notice good" if="secret" role="status">
+    <p>The passphrase for <strong>${secretFor}</strong>. Send it to them now — it
+    is not stored anywhere it can be read again, so this is the only time it is
+    shown.</p>
+    <code class="secret">${secret}</code>
+  </div>
+
+  <h2>Who can sign in</h2>
+
+  <ul class="rows">
+    <li each="person of people" key="person.id">
+      <span class="what">
+        ${person.name}
+        <span class="meta">${person.email}</span>
+      </span>
+
+      <span class="tag" if="person.id === me.id">You</span>
+
+      <form method="post">
+        <input type="hidden" name="id" value="${person.id}" />
+        <button type="submit" name="intent" value="reset" class="quiet">
+          New passphrase
+        </button>
+      </form>
+
+      <!-- The dialog carries its own form, so it is a sibling of the reset
+           form above rather than nested in one. The hidden field travels
+           through the slot. -->
+      <confirm-button
+        if="person.id !== me.id"
+        token="member-${person.id}"
+        label="Remove"
+        heading="Remove ${person.name}?"
+        detail="${person.email}"
+        note="Their passphrase stops working at once, and any session they have open is dead. Nobody else is affected."
+        confirm="Remove them"
+        cancel="Keep them"
+        value="remove"
+      >
+        <input type="hidden" name="id" value="${person.id}" />
+      </confirm-button>
+    </li>
+  </ul>
+
+  <h2>Add somebody</h2>
+
+  <!-- The one form here that does not redirect after a success. It cannot: the
+       generated passphrase is shown once and is nowhere to redirect to, and a
+       secret does not belong in a URL. `autocomplete="off"` is what stops the
+       browser putting the name and address back into the emptied fields. -->
+  <form method="post" autocomplete="off">
+    <div class="row">
+      <label class="field" for="name">
+        <span>Name</span>
+        <input
+          id="name"
+          name="name"
+          type="text"
+          value="${form.name}"
+          maxlength="80"
+          aria-invalid="${errors.name ? 'true' : 'false'}"
+          required
+        />
+        <strong class="error" if="errors.name">${errors.name}</strong>
+      </label>
+
+      <label class="field" for="email">
+        <span>Email</span>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value="${form.email}"
+          autocapitalize="off"
+          spellcheck="false"
+          aria-invalid="${errors.email ? 'true' : 'false'}"
+          required
+        />
+        <strong class="error" if="errors.email">${errors.email}</strong>
+      </label>
+    </div>
+
+    <div class="actions">
+      <button type="submit" name="intent" value="add">Add</button>
+    </div>
+    <p class="hint">A passphrase is generated and shown once, for you to pass on.</p>
+  </form>
+</div>

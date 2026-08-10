@@ -1,0 +1,278 @@
+<script server>
+  import { add, byId, byUrl, counts, DRAFT, list, PUBLISHED } from '../../data/articles.js';
+  import { canonical, reputation, reputationEnabled } from '../../data/link-check.js';
+  import { all as readSettings } from '../../data/settings.js';
+  import { fromLocalInput, toLocalInput } from '../../lib/days.js';
+  import { member, turnAway } from '../../lib/guard.js';
+
+  export const prerender = false;
+
+  // Denser than the reader's page, because this one is a work list rather than
+  // something to read. Paginated for the same reason the reader's page is: a
+  // site that posts ten headlines a day has four thousand in a year, and a
+  // silent `limit` would quietly stop showing the oldest of them.
+  const PER_PAGE = 50;
+
+  export default async ({ action, url }) => {
+    const site = await readSettings();
+    const asked = new URL(url).searchParams;
+
+    const { items, page, pages, total } = await list({
+      page: Number(asked.get('page') ?? '1'),
+      perPage: PER_PAGE,
+    });
+    const { drafts } = await counts();
+
+    // Post/Redirect/Get: a successful add comes back as a redirect carrying the
+    // id, so the confirmation survives without the form being re-rendered.
+    // Looked up rather than found in `items`, because a headline given an old
+    // date is not on the page that follows the redirect.
+    const postedId = asked.get('posted');
+    const posted = postedId ? ((await byId(postedId))?.headline ?? null) : null;
+
+    return {
+      site,
+      items: items.map((item) => ({
+        ...item,
+        when: toLocalInput(item.publishedAt, site.timezone).replace('T', ' '),
+      })),
+      total,
+      drafts,
+      page,
+      pages,
+      older: page < pages ? `/admin?page=${page + 1}` : null,
+      newer: page > 1 ? (page === 2 ? '/admin' : `/admin?page=${page - 1}`) : null,
+      // What the form should show again after a refusal, so nothing typed is
+      // lost. Empty on a fresh load.
+      form: /** @type {{ headline: string, url: string, source: string, publishedAt: string }} */ (
+        action?.form ?? { headline: '', url: '', source: '', publishedAt: '' }
+      ),
+      errors: /** @type {Record<string, string>} */ (action?.errors ?? {}),
+      warning: action?.warning ?? null,
+      posted,
+      now: toLocalInput(new Date().toISOString(), site.timezone),
+      checking: reputationEnabled(),
+    };
+  };
+
+  export const POST = async (ctx) => {
+    // First line, always. An action runs before the layout guard — see
+    // app/lib/guard.js.
+    const me = await member(ctx);
+    if (!me) return turnAway(ctx);
+
+    const { request, revalidateTag } = ctx;
+    const site = await readSettings();
+    const form = await request.formData();
+
+    const headline = String(form.get('headline') ?? '').trim();
+    const source = String(form.get('source') ?? '').trim();
+    const typedUrl = String(form.get('url') ?? '');
+    const typedWhen = String(form.get('publishedAt') ?? '').trim();
+    // Set by the "Post anyway" button on a warned link, so the same submission
+    // gets through the second time without the check standing in the way.
+    const forced = form.get('force') === '1';
+
+    const echo = { headline, url: typedUrl, source, publishedAt: typedWhen };
+
+    /** @type {Record<string, string>} */
+    const errors = {};
+
+    if (!headline) errors.headline = 'A headline is needed.';
+    else if (headline.length > 300) errors.headline = 'Keep it under 300 characters.';
+    if (source.length > 80) errors.source = 'Keep the source under 80 characters.';
+
+    const link = canonical(typedUrl);
+    if (!link.ok) errors.url = link.error;
+
+    const publishedAt = typedWhen
+      ? fromLocalInput(typedWhen, site.timezone)
+      : new Date().toISOString();
+    if (!publishedAt) errors.publishedAt = 'That is not a date and time.';
+
+    if (Object.keys(errors).length) return { errors, form: echo };
+
+    // Both were reported above. Restating them as a guard is what tells the type
+    // checker that `link.url` and `publishedAt` are set from here on; a list of
+    // errors collected across several fields cannot narrow on its own.
+    if (!link.ok || !publishedAt) return { errors, form: echo };
+
+    const already = await byUrl(link.url);
+    if (already) {
+      return {
+        errors: { url: `Already here, as “${already.headline}”.` },
+        form: echo,
+      };
+    }
+
+    // Advisory, and only when a key is configured. `reputation` never throws
+    // and never blocks for more than three seconds.
+    let flagReason = null;
+    if (!forced) {
+      const verdict = await reputation(link.url);
+      if (verdict.reason) {
+        return { warning: verdict.reason, form: { ...echo, url: link.url }, errors: {} };
+      }
+    } else {
+      const verdict = await reputation(link.url);
+      flagReason = verdict.reason;
+    }
+
+    const article = await add({
+      headline,
+      url: link.url,
+      source,
+      publishedAt,
+      status: form.get('draft') === '1' ? DRAFT : PUBLISHED,
+      breakingAt: form.get('breaking') === '1' ? new Date().toISOString() : null,
+      flagReason,
+      createdBy: me.id,
+    });
+
+    // The reader's page holds its render for a minute. An edit should not wait
+    // that long to appear, so the tag it was cached under is dropped here.
+    revalidateTag('articles');
+
+    // Post/Redirect/Get, and not only for tidiness. Re-rendering the page as the
+    // answer to a POST leaves the browser's own form restoration free to put
+    // back everything just typed, so the form appears not to have cleared. It
+    // also makes a refresh re-submit, which is where duplicate posts come from.
+    // A redirect settles both: a fresh GET, an empty form, and a reload that
+    // reloads.
+    //
+    // A refusal above still re-renders, because that is what keeps the typed
+    // values on the page to be corrected.
+    return Response.redirect(new URL(`/admin?posted=${article?.id ?? ''}`, ctx.url), 303);
+  };
+</script>
+
+<title>Headlines</title>
+
+<div class="sheet">
+  <h1>Headlines</h1>
+  <p class="lede">
+    ${total} in all<span if="drafts">, ${drafts} of them drafts</span><span
+      if="pages > 1"
+      >. Page ${page} of ${pages}</span
+    >.
+  </p>
+
+  <p class="notice good" if="posted" role="status">Posted “${posted}”.</p>
+
+  <p class="notice bad" if="warning" role="alert">
+    ${warning} The link is still below — post it again to publish it anyway, and
+    the warning will be kept on the record.
+  </p>
+
+  <h2>Add one</h2>
+
+  <form method="post" autocomplete="off">
+    <label class="field" for="headline">
+      <span>Headline</span>
+      <input
+        id="headline"
+        name="headline"
+        type="text"
+        value="${form.headline}"
+        maxlength="300"
+        aria-invalid="${errors.headline ? 'true' : 'false'}"
+        required
+      />
+      <strong class="error" if="errors.headline">${errors.headline}</strong>
+    </label>
+
+    <label class="field" for="url">
+      <span>Link</span>
+      <input
+        id="url"
+        name="url"
+        type="text"
+        inputmode="url"
+        value="${form.url}"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-invalid="${errors.url ? 'true' : 'false'}"
+        aria-describedby="url-hint"
+        required
+      />
+      <span class="hint" id="url-hint">
+        Tracking parameters are stripped<span if="checking">, and the link is
+        checked against Google Safe Browsing</span>.
+      </span>
+      <strong class="error" if="errors.url">${errors.url}</strong>
+    </label>
+
+    <div class="row">
+      <label class="field" for="source">
+        <span>Source</span>
+        <input
+          id="source"
+          name="source"
+          type="text"
+          value="${form.source}"
+          maxlength="80"
+          aria-invalid="${errors.source ? 'true' : 'false'}"
+        />
+        <span class="hint">Optional. The publisher's name.</span>
+        <strong class="error" if="errors.source">${errors.source}</strong>
+      </label>
+
+      <label class="field" for="publishedAt">
+        <span>Dated</span>
+        <input
+          id="publishedAt"
+          name="publishedAt"
+          type="datetime-local"
+          value="${form.publishedAt || now}"
+          aria-invalid="${errors.publishedAt ? 'true' : 'false'}"
+        />
+        <span class="hint">${site.timezone}. This is what the page sorts by.</span>
+        <strong class="error" if="errors.publishedAt">${errors.publishedAt}</strong>
+      </label>
+    </div>
+
+    <label class="checkbox" for="breaking">
+      <input id="breaking" name="breaking" type="checkbox" value="1" />
+      <span>
+        Breaking. It sits above the day headings, in the breaking color, and
+        stops being breaking on its own once the window in
+        <a href="/admin/settings#breaking">Settings</a> passes.
+      </span>
+    </label>
+
+    <label class="checkbox" for="draft">
+      <input id="draft" name="draft" type="checkbox" value="1" />
+      <span>Save as a draft, so it does not appear on the site yet.</span>
+    </label>
+
+    <div class="actions">
+      <button type="submit">Post</button>
+      <button type="submit" name="force" value="1" class="danger" if="warning">
+        Post anyway
+      </button>
+    </div>
+  </form>
+
+  <h2>Posted</h2>
+
+  <p class="empty" if="!items.length">Nothing yet.</p>
+
+  <ul class="rows" else>
+    <li each="item of items" key="item.id">
+      <span class="what">
+        <a href="/admin/articles/${item.id}">${item.headline}</a>
+        <span class="meta">${item.when} · ${item.url}</span>
+      </span>
+
+      <span class="tag breaking-tag" if="item.breakingAt">Breaking</span>
+      <span class="tag draft" if="item.status === 'draft'">Draft</span>
+      <span class="tag flagged" if="item.flagReason" title="${item.flagReason}">Flagged</span>
+    </li>
+  </ul>
+
+  <nav class="pager" if="pages > 1" aria-label="More headlines">
+    <a if="newer" href="${newer}" rel="prev">Newer</a>
+    <span class="where">Page ${page} of ${pages}</span>
+    <a if="older" href="${older}" rel="next">Older</a>
+  </nav>
+</div>

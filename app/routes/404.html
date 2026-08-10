@@ -1,0 +1,23 @@
+<script server>
+  import { DEFAULTS } from '../data/settings.js';
+  import { stringsFor } from '../lib/strings.js';
+
+  // The one loader in the app that must not touch the database.
+  //
+  // An error page has to be bytes. One that renders when a request has already
+  // failed can fail too, so the build writes this to a file whatever it says
+  // about `prerender` — and at build time there is no request, no visitor and
+  // no binding. It reads `DEFAULTS` instead, whose locale comes from
+  // `SITE_LOCALE` in the build environment. That is the escape hatch for a
+  // buyer who is not publishing in English: set it before `npm run build`.
+  export default async () => ({ s: stringsFor(DEFAULTS.locale) });
+</script>
+
+<title>${s.notFound}</title>
+<meta name="robots" content="noindex" />
+
+<div class="sheet">
+  <h1>${s.notFound}</h1>
+  <p class="lede">${s.notFoundBody}</p>
+  <p><a href="/">${s.backToHeadlines}</a></p>
+</div>

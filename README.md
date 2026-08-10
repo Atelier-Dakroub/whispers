@@ -1,0 +1,320 @@
+# whispers.news
+
+A headline-only news site. A logo, and links in descending date order, grouped
+under a heading for each day. Every headline is a link out.
+
+Server-rendered HTML with no client bundle. The reader's page ships no
+JavaScript at all, and neither does the admin.
+
+```sh
+npm install
+npm run db:migrate
+npm run dev            # http://localhost:1960
+```
+
+The first visitor to a site nobody has claimed gets `/setup` and makes the first
+account. There is no seed step and nothing to edit before it will let you in.
+
+## What the owner can change
+
+Sign in and everything is under `/admin`.
+
+| | |
+| --- | --- |
+| `/admin` | post a headline, and the list of everything posted, 50 to a page |
+| `/admin/articles/<id>` | edit, publish, unpublish, mark breaking, delete |
+| `/admin/settings` | name, tagline, time zone, language, fonts, colors, light/dark, day headings, source, time, rules, density, headlines per page, logo |
+| `/admin/people` | add, remove, and reset a passphrase |
+
+A headline holds a headline, a link, an optional source, and a date. It is a
+draft or it is published; a draft is on no page and in no feed.
+
+## The database is yours
+
+Drizzle, with the driver chosen by `DB_DRIVER`. One schema serves the whole
+SQLite family and a second serves Postgres; both are generated from
+`app/data/schema.sqlite.js` and `app/data/schema.pg.js`, which declare the same
+tables under the same names.
+
+| `DB_DRIVER` | `DATABASE_URL` | |
+| --- | --- | --- |
+| `libsql` *(default)* | `file:./data/whispers.db` | a file, or Turso with a `libsql://` URL |
+| `better-sqlite3` | `./data/whispers.db` | `npm install better-sqlite3` |
+| `postgres` | `postgres://…` | `npm install postgres` |
+| — | — | Cloudflare D1, wired in `worker.js` from the binding |
+
+```sh
+npm run db:generate    # regenerate both migration sets after a schema change
+npm run db:migrate     # apply them to whatever DB_DRIVER names
+npm run db:reset -- --yes    # erase everything and start at /setup again
+```
+
+Adding a column means editing **both** schema files in the same commit and
+running `db:generate`, which does both dialects at once for that reason.
+
+Nothing above `app/data/` imports Drizzle. The routes read through
+`articles.js`, `settings.js`, `members.js` and `assets.js`, so a third dialect
+is one new schema file rather than a sweep through the app.
+
+## Accounts
+
+Each person has their own passphrase. That is the whole reason removing somebody
+works: with a shared secret, taking an address off a list is bookkeeping,
+because the person still knows the secret and can type a colleague's address.
+Here the row is the credential, and deleting it is the revocation.
+
+A passphrase is generated when you add somebody, shown once, and stored only as
+a PBKDF2 verifier. There is no way to look one up again — reset it instead.
+
+```sh
+npm run member:list
+npm run member:add   -- them@example.com "Their Name"
+npm run member:reset -- you@example.com
+```
+
+`member:reset` is the way back in when the last passphrase is lost. It needs
+shell access to the server, which is the point: it is the one door that does not
+open over HTTP.
+
+`db:reset` drops the tables rather than deleting the file, so it takes effect on
+a server that is already running — no restart, and no stale process quietly
+serving the data you thought you erased.
+
+**On Cloudflare's free plan, sign-in will time out.** The default cost is 600,000
+PBKDF2 rounds, about a third of a second of CPU, and the free plan allows 10ms
+per request. The paid plan's limit is 30s and is fine. To run on the free plan,
+lower `passphraseRounds` in the settings table — the number is written into each
+stored verifier, so changing it leaves existing passphrases working.
+
+## Links
+
+Every submitted URL is canonicalized before it is stored: a missing scheme is
+assumed to be `https`, tracking parameters are stripped, a fragment is dropped,
+and a URL already in the table is refused as a duplicate. `http` and `https`
+only, no credentials in the URL, no private or non-public hosts.
+
+Set `GOOGLE_SAFE_BROWSING_API_KEY` and each link is also checked against Google
+Safe Browsing on the way in and on the way to being published. It is advisory:
+a match shows a warning with a **Post anyway** button, the reason is kept on the
+record, and a network failure or a missing key lets the post through. Without a
+key nothing else changes.
+
+## The reader's page
+
+What the owner can turn on and off: day headings, the source after a headline,
+the time a story is dated, the line between headlines, and the reading density
+— compact, normal or relaxed, which moves the line height and the space around
+each row together, because that pair is what density means to a reader.
+
+The time is the one with a rule behind it. Under a day heading it shows the time
+alone, because the heading already said which day. With headings off it carries
+the date as well: a bare `06:47` on a three-day-old story reads as this morning.
+
+Colors have a **Reset colors to default** button. It resets the six and nothing
+else — a reset that also changed the typography would be a different button.
+
+## Breaking
+
+A breaking story sits above the day headings, in its own color, under a
+`BREAKING` label — the label matters, because color alone is not a signal
+everyone receives.
+
+It stops being breaking on its own. The column holds **when** a story was
+marked, not that it is, and the page compares that to a cutoff at render time.
+So there is no cron, no cleanup job, and no state that can get stuck: a story
+marked this morning is out of the band by evening and back in the list with
+everything else, still published, nothing lost.
+
+The window is a setting, in hours. `0` keeps a story breaking until somebody
+unmarks it.
+
+The reason for the expiry is not tidiness. A `BREAKING` banner that is three
+days old costs you the credibility of every future one.
+
+## The footer credit
+
+`Powered by Whispers` renders in the footer by default, and a setting turns it
+off.
+
+Nothing enforces it. The personal license asks you to keep it and the
+commercial license does not require it — but this app promises there is no key
+to enter and nothing counting installs, and a technical lock would make that
+promise false. The admin states which license expects what, and then trusts the
+owner.
+
+## Fonts
+
+Two settings, for the two roles the page has: the face headlines are set in,
+and the one labels, dates and the admin use. Both come from
+[Modern Font Stacks](https://modernfontstacks.com/) — faces already installed on
+the machine reading the page, so nothing is downloaded, nothing blocks the first
+paint, and there is no license to host.
+
+The settings table holds a stack **id**, never a `font-family` value. An id
+cannot carry anything into a style attribute, and a stack can be corrected in
+`app/lib/fonts.js` later without touching anybody's data.
+
+## Language and direction
+
+The locale setting decides four things, and only one of them is a translation.
+
+`Intl` handles three on its own, for every locale it ships: how a date is
+spelled, how a number is written, and the words *today* and *yesterday* —
+`aujourd'hui`, `أمس`, `今日`. None of those is in a table anybody maintains.
+
+The fourth is the eleven words the reader sees that are not the news: the skip
+link, the footer, the pager, the empty state, the not-found page. They live in
+`app/lib/strings.js`, with English, French, Spanish, German, Portuguese and
+Arabic. Adding a language is adding a key; a partial one falls back to English
+one string at a time.
+
+The locale also sets `lang` and `dir` on `<html>`, and every direction-sensitive
+rule in the stylesheet is logical — `margin-inline-start`, not `margin-left` —
+so an Arabic or Hebrew site mirrors with nothing else to change.
+
+**The admin is English and stays English.** It is a hundred and fifty strings
+seen by one to five people who chose to install it. This file is the part a
+buyer's *audience* reads.
+
+**`404.html` is the exception.** It is written to a file at build time, where
+there is no database to read the setting from, so it takes its language from
+`SITE_LOCALE` in the build environment instead.
+
+## The logo, light and dark
+
+Two uploads. The first is used everywhere; the second is optional and is used
+on a dark background — which is what a wordmark drawn in black ink needs, since
+it disappears otherwise. With no second artwork the first is used on both.
+
+Which one ships depends on **who is deciding the theme**, and this is the part
+that is easy to get wrong:
+
+| Theme setting | Who decides | What the masthead does |
+| --- | --- | --- |
+| Follow the reader | the reader | `<picture>` with `media="(prefers-color-scheme: dark)"` |
+| Always dark | the site | the dark artwork, no media query |
+| Always light | the site | the main artwork, no media query |
+
+`prefers-color-scheme` is the reader's own setting; `color-scheme` on `<html>`
+is this site's. They agree only on *follow the reader*. Use the media query
+under a pinned theme and a reader whose laptop is in light mode gets the light
+artwork on a dark masthead — the exact failure the second upload exists to
+prevent. All three rows are tested.
+
+In the admin each preview sits on the ground it is for, rather than on whatever
+the admin's own theme happens to be.
+
+## Contrast
+
+Every color is the owner's to choose, which is the feature — and it means a
+palette nobody can read is one click away. So the settings page measures what
+was chosen and says so, using [APCA](https://git.apcacontrast.com) rather than a
+WCAG 2 ratio: APCA accounts for polarity, so the same two colors score
+differently as a light theme and as a dark one, which is exactly the thing a
+theming feature gets wrong.
+
+It reports; it does not refuse. A masthead in a brand color that lands slightly
+under the bar is the owner's call, and an app that blocked it would be wrong
+about who decides.
+
+The shipped palette passes on both polarities. Two things in it did not, and
+were found by measuring rather than by looking:
+
+- `--muted` — day headings, sources, times — was mixed at one percentage for
+  both modes. That is Lc 70 on a light ground and **Lc 33** on a dark one. It is
+  now mixed per polarity, 50% and 78%.
+- `--rule`, the line between headlines, computed to **Lc 0.0** in dark mode:
+  APCA's way of saying the line was not there at all.
+
+Small text got bigger rather than darker where it was failing. Crushing a label
+to near-black to pass at 11px wins the measurement and loses the design; the fix
+for small is bigger first.
+
+## Light and dark
+
+The six colors live in the database and reach the page as custom properties on
+`<body>`. The stylesheet resolves them with `light-dark()` over the
+`color-scheme` the theme setting puts on `<html>`.
+
+So the theme is decided before the first paint, by the browser, with no script,
+no cookie and no flash — and "follow the reader's setting" costs nothing extra.
+
+## Deploying
+
+### Cloudflare
+
+```sh
+npx wrangler d1 create whispers          # paste the id into wrangler.jsonc
+npx wrangler d1 migrations apply whispers --remote
+npx wrangler secret put COOKIE_SECRET
+npm run deploy
+```
+
+`wrangler.jsonc` points `migrations_dir` at `drizzle/sqlite`, so wrangler and
+`npm run db:migrate` apply the same SQL.
+
+Locally, `npm run start:worker` runs the real workerd with a local D1 after
+`npx wrangler d1 migrations apply whispers --local`. Use `npm run dev` for
+day-to-day work — it has hot reload and reads a local file instead.
+
+### Anything that runs Node
+
+```sh
+npm run build
+npm start
+```
+
+Set `COOKIE_SECRET`, `DB_DRIVER` and `DATABASE_URL` in the environment.
+`.env.example` lists everything.
+
+## Confirming a delete
+
+`app/elements/confirm-button.html` is a `<dialog>` opened by `command` and
+`commandfor` — the platform's own invoker. It guards deleting a headline,
+removing a member and removing the logo. There is no click handler, so no
+script and no CSP hash, and the browser supplies the backdrop, the focus trap,
+Escape to dismiss, the inert page behind, and focus returned to the button
+afterwards. Confirming submits an ordinary form.
+
+Its `token` prop becomes the dialog's id. It is not called `key`, because `key`
+is one of the framework's directives — the compiler takes the attribute and the
+prop arrives empty, which gives every dialog on the page the same id.
+
+Invoker commands shipped across all three engines during 2025. On anything
+older the button does nothing, so the delete is unreachable rather than
+unguarded — the safe direction, but worth knowing.
+
+## Two things worth knowing before editing
+
+**Every action under `admin/` begins with `member(ctx)`** from
+`app/lib/guard.js`. Core 0.10.0 runs the layout guards before the action, so
+`admin/_layout.html` already turns a signed-out POST away and these calls are
+belt and braces — kept because the cost is a line and the failure they prevent
+is a silent unauthenticated write, and because a second check survives a page
+being moved out from under its guarding layout. `test/app.test.js` asserts a
+signed-out POST to every admin route is refused.
+
+**A page that reads the database needs `export const prerender = false`.** The
+build renders on a machine with no binding, and would otherwise write a snapshot
+that never changes again. `404.html` is the exception: it is always written to a
+file, so it has no loader, and every repository answers with defaults when no
+database is wired — which is what makes `npm run build` work in CI.
+
+## Commands
+
+| | |
+| --- | --- |
+| `npm run dev` | dev server, hot reload |
+| `npm run check` | types, from the shapes the loaders return |
+| `npm test` | the whole app over real requests |
+| `npm run preview` | build, then serve the build |
+| `npm run start:worker` | the real workerd, on local D1 |
+| `npm run deploy` | build and ship to Cloudflare |
+
+The reader's page is cached for a minute and dropped by tag whenever anything is
+edited, so an edit shows at once. On Workers that cache is per-isolate: an edit
+clears the isolate that served it, and the others catch up within the minute.
+
+`npm audit` reports a moderate advisory in `drizzle-kit`'s esbuild dependency.
+It affects the local dev server of a build-time tool, is not in the app and is
+not deployed.
