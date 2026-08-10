@@ -12,8 +12,9 @@ that reads the same twenty sources.
 **The reader's page ships zero JavaScript.** Not "a small amount" — none. The
 theme, the fonts and the colors arrive as custom properties the server wrote,
 resolved by the browser before the first paint, so light and dark switch with no
-flash and no script. The admin ships one file of about 1.5 KB, and only so the
-settings form can preview a color while you pick it.
+flash and no script. The admin ships one file — 2.3 KB, 800 bytes
+compressed — and only so the settings form can preview a color while you pick
+it.
 
 **You get the repository, not an account.** Nothing phones home, nothing
 expires, and there is no key to enter.
@@ -37,9 +38,9 @@ nothing to edit before it will let you in.
   day headings in its own color. It expires on its own after a window you set,
   because a `BREAKING` banner that is three days old costs you every future one.
 - **Yours to look at.** Eight colors, two font stacks, light and dark, reading
-  density, day headings, sources, times and the rules between lines — all from
-  the admin, with a live preview. Two logos, one for a light page and one for a
-  dark one.
+  density, day headings, sources, times, the rules between lines, and whether a
+  headline opens in a new tab — all from the admin, with a live preview. Two
+  logos, one for a light page and one for a dark one.
 - **Contrast you can trust.** The admin measures your palette with
   [APCA](https://git.apcacontrast.com) and tells you what is hard to read. It
   reports rather than refuses: your masthead is your call.
@@ -70,7 +71,7 @@ Sign in and everything is under `/admin`.
 | --- | --- |
 | `/admin` | post a headline, and the list of everything posted, 50 to a page |
 | `/admin/articles/<id>` | edit, publish, unpublish, mark breaking, delete |
-| `/admin/settings` | name, tagline, time zone, language, fonts, colors, light/dark, day headings, source, time, rules, density, headlines per page, logo |
+| `/admin/settings` | name, tagline, time zone, language, fonts, colors, light/dark, day headings, source, time, rules, density, headlines per page, new-tab links, how long a story stays breaking, the footer credit, logo |
 | `/admin/people` | add, remove, and reset a passphrase |
 
 A headline holds a headline, a link, an optional source, and a date. It is a
@@ -372,7 +373,7 @@ Invoker commands shipped across all three engines during 2025. On anything
 older the button does nothing, so the delete is unreachable rather than
 unguarded — the safe direction, but worth knowing.
 
-## Two things worth knowing before editing
+## Three things worth knowing before editing
 
 **Every action under `admin/` begins with `member(ctx)`** from
 `app/lib/guard.js`. Core 0.10.0 runs the layout guards before the action, so
@@ -387,6 +388,14 @@ build renders on a machine with no binding, and would otherwise write a snapshot
 that never changes again. `404.html` is the exception: it is always written to a
 file, so it has no loader, and every repository answers with defaults when no
 database is wired — which is what makes `npm run build` work in CI.
+
+**`vite.config.js` pins `build.cssTarget`, and it is load-bearing.** Below
+those versions LightningCSS rewrites every `light-dark()` into a polyfill whose
+switch variables it does not emit, so the value becomes invalid — and an invalid
+`var()` inside a shorthand voids the whole declaration. `border: 1px solid
+var(--rule)` silently becomes no border, and the palette goes with it. Nothing
+in the CSS is wrong when this happens, which is what makes it hard to find.
+`npm test` checks the built stylesheet for it.
 
 ## Commands
 
@@ -403,6 +412,12 @@ The reader's page is cached for a minute and dropped by tag whenever anything is
 edited, so an edit shows at once. On Workers that cache is per-isolate: an edit
 clears the isolate that served it, and the others catch up within the minute.
 
-`npm audit` reports a moderate advisory in `drizzle-kit`'s esbuild dependency.
-It affects the local dev server of a build-time tool, is not in the app and is
-not deployed.
+`npm audit` reports four moderate advisories, all of them in build-time
+tooling — `npm audit --omit=dev` reports none. Nothing there is in the app or
+is deployed.
+
+`wrangler.demo.jsonc` is the config behind the public demo at
+[demo.whispers.news](https://demo.whispers.news), kept in the repository as a
+worked example of `wrangler.jsonc` with its placeholders filled in. Its `npm run
+deploy:demo` and `db:migrate:demo` scripts point at a database you do not have;
+they are there to be read, not run.
