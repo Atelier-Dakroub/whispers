@@ -1,5 +1,7 @@
 {
-  "name": "whispers-news",
+  // Your install. The marketing site is a separate worker also on Cloudflare,
+  // so these two must not share a name.
+  "name": "whispers",
   "main": "worker.js",
   "compatibility_date": "2026-01-01",
 
@@ -31,8 +33,9 @@
   //   npx wrangler secret put COOKIE_SECRET
   //   npx wrangler secret put GOOGLE_SAFE_BROWSING_API_KEY   (optional)
   //
-  // And the address, once there is one:
-  // "routes": [{ "pattern": "whispers.news", "custom_domain": true }]
+  // And the address, once there is one — your domain, on your Cloudflare
+  // account, with the zone already added:
+  // "routes": [{ "pattern": "news.example.com", "custom_domain": true }]
   //
   // `wrangler dev` reads .dev.vars for the same names.
 }
