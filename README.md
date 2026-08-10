@@ -1,5 +1,7 @@
 # Whispers
 
+[![CI](https://github.com/Atelier-Dakroub/whispers/actions/workflows/ci.yml/badge.svg)](https://github.com/Atelier-Dakroub/whispers/actions/workflows/ci.yml)
+
 **A headline-only news site you own.** One scannable page: your logo, and links
 in descending date order under a heading for each day. Every headline is a link
 out. That is the whole product, and the restraint is the point — a reader takes
@@ -396,6 +398,16 @@ switch variables it does not emit, so the value becomes invalid — and an inval
 var(--rule)` silently becomes no border, and the palette goes with it. Nothing
 in the CSS is wrong when this happens, which is what makes it hard to find.
 `npm test` checks the built stylesheet for it.
+
+## Versions
+
+Releases are tagged, and [CHANGELOG.md](CHANGELOG.md) says what changed and
+whether it needs a migration. To upgrade: pull or download the release, then
+
+```sh
+npm install
+npm run db:migrate
+```
 
 ## Commands
 

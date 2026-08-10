@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # So a release tag is verified as its own thing, not assumed from the branch.
+  tags: ['v*']
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `npm ci` rather than `npm install`, so the lockfile is what is tested.
+      - run: npm ci
+
+      # A build with no database reachable and no .env at all. This is the
+      # 404.html case: it is written at build time on a machine with no
+      # binding, and every repository has to answer with defaults rather than
+      # throw. If this step needs a database, the build is broken for CI and
+      # for anyone deploying from one.
+      - run: npm run build
+
+      - run: npm run check
+
+      # `pretest` rebuilds, resets data/test.db and migrates it, so this runs
+      # against a database created from the migrations on this commit.
+      - run: npm test
