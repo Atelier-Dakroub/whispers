@@ -489,17 +489,10 @@ npm run db:migrate
 | `npm run start:worker` | the real workerd, on local D1 |
 | `npm run deploy` | build and ship to Cloudflare |
 
-**The reader's page is not cached, and the reason is a bug in the framework.**
-`export const revalidate` is commented out in `app/routes/index.html`. The
-framework rebuilds a stale page behind the response and does not hold that work
-with `waitUntil`. workerd cancels it, the promise never settles, and the
-framework's `inFlight` map keeps a dead entry for that page. Every later request
-waits on it. The page then hangs for good, about one minute after the first
-visitor.
-
-Node, Deno and Bun do not cancel the work, so the fault is Cloudflare only. If
-you deploy to Node and want the cache, remove the comment. Each page then costs
-a few database reads per request, which is what the cache existed to save.
+The app caches the reader's page for one minute. An edit drops that cache by
+tag, so a change is visible immediately. On Workers the cache belongs to one
+isolate. An edit clears the isolate that served the request, and the other
+isolates become correct within the minute.
 
 `npm audit` reports four moderate advisories. All of them are in build-time
 tools, and `npm audit --omit=dev` reports none. That code is not in the app, and the

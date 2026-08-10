@@ -25,12 +25,10 @@ of view of somebody running the site rather than reading the code:
 
 ### Fixed
 
-- **The reader's page hung on Cloudflare, permanently, about a minute after the
-  first visitor.** `revalidate` is now commented out in
-  `app/routes/index.html`. The framework rebuilds a stale page behind the
-  response without `waitUntil`; workerd cancels that work, the promise never
-  settles, and its `inFlight` entry is never cleared, so every later request
-  waits on a dead promise. Node, Deno and Bun are not affected.
+- **The reader's page went stale and stayed stale on Cloudflare, and could hang
+  after an edit.** The framework rebuilt a stale page behind the response
+  without `waitUntil`, so workerd stopped that work when the response was sent.
+  Fixed in `@transclude/core` 0.10.2, which this release requires.
 - A section heading and a checkbox both used `id="sponsor"`, so the label
   labelled nothing and clicking it did nothing.
 
