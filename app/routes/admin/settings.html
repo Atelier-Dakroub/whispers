@@ -943,8 +943,6 @@
     const empty = document.getElementById(slot + '-empty');
     const chosen = document.getElementById(slot + '-chosen');
 
-    let objectUrl = null;
-
     const show = () => {
       const file = input.files && input.files[0];
       if (!file) return;
@@ -954,14 +952,29 @@
       if (chosen) chosen.textContent = 'Chosen: ' + file.name;
 
       if (preview) {
-        // Revoked before the next one replaces it, or every pick leaks a blob
-        // for the life of the page.
-        if (objectUrl) URL.revokeObjectURL(objectUrl);
-        objectUrl = URL.createObjectURL(file);
-        preview.src = objectUrl;
-        preview.hidden = false;
+        // A data URL, not `URL.createObjectURL`.
+        //
+        // An object URL is the better mechanism — no base64, and revocable —
+        // but it produces a `blob:` URL, and this app's Content-Security-Policy
+        // allows images from `'self'` and `data:` only. The preview was being
+        // blocked silently: the filename appeared and the picture never did.
+        //
+        // Widening the policy would have meant restating it in full, because
+        // the framework replaces the default directives rather than merging
+        // with them — so the app would stop inheriting future defaults, and one
+        // line of preview would have pinned the whole security posture. Reading
+        // the file costs a base64 string for something under 256 KB, once,
+        // thrown away on the next pick.
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+          preview.src = String(reader.result);
+          preview.hidden = false;
+          if (empty) empty.hidden = true;
+        });
+        reader.readAsDataURL(file);
+      } else if (empty) {
+        empty.hidden = true;
       }
-      if (empty) empty.hidden = true;
 
       touched();
     };

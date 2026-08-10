@@ -16,6 +16,18 @@
    from the theme setting. No script, no cookie, no flash: the browser resolves
    it before the first paint. */
 
+/* `hidden` is a UA rule, and any author rule that sets `display` beats it —
+   which means an element with the attribute stays on screen. `.logo` setting
+   `display: block` did exactly that: the empty preview was still a flex item,
+   and it pushed the "Nothing uploaded" text off centre.
+   
+   `!important` because the whole point is to outrank whatever display the
+   element was given. If something needs to be laid out while hidden, it should
+   not be using the attribute. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   --bg: light-dark(var(--bg-l), var(--bg-d));
   --ink: light-dark(var(--ink-l), var(--ink-d));
