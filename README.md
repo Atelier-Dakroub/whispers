@@ -184,23 +184,6 @@ unmarks it.
 The reason for the expiry is not tidiness. A `BREAKING` banner that is three
 days old costs you the credibility of every future one.
 
-## Selling it
-
-Purchases go through [Polar](https://polar.sh), which is a merchant of record —
-so sales tax and VAT are handled and the buyer gets the invoice the pricing page
-promises. The checkout link is created in the Polar dashboard and pasted into
-`app/routes/_layout.html` in the marketing site, in one place.
-
-**Do not wire Polar's license keys into this app.** Polar can issue keys with
-activation limits and a validation endpoint, and it is tempting. But the pricing
-page says, in as many words, that there is no key to enter and nothing counting
-installs — and the footer credit is honest for the same reason. A key check
-would make both of those false, turn every buyer's outage into your outage, and
-buy nothing: the license is a legal instrument, and someone willing to ignore it
-is equally willing to delete the check from source they were handed.
-
-Treat the key, if you issue one at all, as a receipt.
-
 ## The footer credit
 
 `Powered by Whispers` renders in the footer by default, and a setting turns it
