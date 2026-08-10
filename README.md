@@ -1,10 +1,22 @@
-# whispers.news
+# Whispers
 
-A headline-only news site. A logo, and links in descending date order, grouped
-under a heading for each day. Every headline is a link out.
+**A headline-only news site you own.** One scannable page: your logo, and links
+in descending date order under a heading for each day. Every headline is a link
+out. That is the whole product, and the restraint is the point — a reader takes
+in forty stories in the time a normal news site spends loading one.
 
-Server-rendered HTML with no client bundle. The reader's page ships no
-JavaScript at all, and neither does the admin.
+For people who catch stories early and want somewhere to put them: a beat
+reporter, a trade newsletter, a neighborhood wire, an internal feed for a team
+that reads the same twenty sources.
+
+**The reader's page ships zero JavaScript.** Not "a small amount" — none. The
+theme, the fonts and the colors arrive as custom properties the server wrote,
+resolved by the browser before the first paint, so light and dark switch with no
+flash and no script. The admin ships one file of about 1.5 KB, and only so the
+settings form can preview a color while you pick it.
+
+**You get the repository, not an account.** Nothing phones home, nothing
+expires, and there is no key to enter.
 
 ```sh
 npm install
@@ -12,8 +24,43 @@ npm run db:migrate
 npm run dev            # http://localhost:1960
 ```
 
-The first visitor to a site nobody has claimed gets `/setup` and makes the first
-account. There is no seed step and nothing to edit before it will let you in.
+Open it and the first visitor to an unclaimed site gets a setup page and makes
+the first account. No seed script, no hash to generate on a command line,
+nothing to edit before it will let you in.
+
+## What it does
+
+- **An admin built for links.** Paste a URL, write the headline, publish.
+  Tracking parameters are stripped, and a link already posted is refused — so
+  the same story never runs twice. Save as a draft and it stays off the site.
+- **Breaking stories that stop being breaking.** Mark one and it sits above the
+  day headings in its own color. It expires on its own after a window you set,
+  because a `BREAKING` banner that is three days old costs you every future one.
+- **Yours to look at.** Eight colors, two font stacks, light and dark, reading
+  density, day headings, sources, times and the rules between lines — all from
+  the admin, with a live preview. Two logos, one for a light page and one for a
+  dark one.
+- **Contrast you can trust.** The admin measures your palette with
+  [APCA](https://git.apcacontrast.com) and tells you what is hard to read. It
+  reports rather than refuses: your masthead is your call.
+- **More than one person.** Everyone gets their own passphrase, so removing
+  somebody locks them out on its own and disturbs nobody else.
+- **A feed**, at `/feed.xml`, from the same headlines. Nothing to configure.
+- **Six languages** for the reader's chrome, with dates, number systems and
+  *today*/*yesterday* from `Intl` — so locales the translation table never saw
+  are still right. Right-to-left works.
+- **Anywhere JavaScript runs.** Node, Bun, Deno or Cloudflare Workers. A SQLite
+  file by default; Turso, Postgres and Cloudflare D1 from the same code.
+
+## What it costs
+
+**Free** for personal, hobby and other noncommercial sites. **$99 once** if
+money changes hands because of the site — ads, sponsorships, affiliate links, a
+paid newsletter, or a company. Unlimited sites on both, including sites you
+build for clients.
+
+Same code either way. See [LICENSE.md](LICENSE.md), or
+[whispers.news](https://whispers.news) to buy.
 
 ## What the owner can change
 
@@ -110,7 +157,7 @@ The time is the one with a rule behind it. Under a day heading it shows the time
 alone, because the heading already said which day. With headings off it carries
 the date as well: a bare `06:47` on a three-day-old story reads as this morning.
 
-Colors have a **Reset colors to default** button. It resets the six and nothing
+Colors have a **Reset colors to default** button. It resets the eight and nothing
 else — a reset that also changed the typography would be a different button.
 
 ## Breaking
@@ -130,6 +177,23 @@ unmarks it.
 
 The reason for the expiry is not tidiness. A `BREAKING` banner that is three
 days old costs you the credibility of every future one.
+
+## Selling it
+
+Purchases go through [Polar](https://polar.sh), which is a merchant of record —
+so sales tax and VAT are handled and the buyer gets the invoice the pricing page
+promises. The checkout link is created in the Polar dashboard and pasted into
+`app/routes/_layout.html` in the marketing site, in one place.
+
+**Do not wire Polar's license keys into this app.** Polar can issue keys with
+activation limits and a validation endpoint, and it is tempting. But the pricing
+page says, in as many words, that there is no key to enter and nothing counting
+installs — and the footer credit is honest for the same reason. A key check
+would make both of those false, turn every buyer's outage into your outage, and
+buy nothing: the license is a legal instrument, and someone willing to ignore it
+is equally willing to delete the check from source they were handed.
+
+Treat the key, if you issue one at all, as a receipt.
 
 ## The footer credit
 
