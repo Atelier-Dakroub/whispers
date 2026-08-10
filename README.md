@@ -127,11 +127,14 @@ open over HTTP.
 a server that is already running — no restart, and no stale process quietly
 serving the data you thought you erased.
 
-**On Cloudflare's free plan, sign-in will time out.** The default cost is 600,000
-PBKDF2 rounds, about a third of a second of CPU, and the free plan allows 10ms
-per request. The paid plan's limit is 30s and is fine. To run on the free plan,
-lower `passphraseRounds` in the settings table — the number is written into each
-stored verifier, so changing it leaves existing passphrases working.
+**Passphrases are hashed at 100,000 PBKDF2 rounds, not OWASP's 600,000.** That
+is workerd's ceiling: above it Cloudflare's WebCrypto throws
+`NotSupportedError` rather than running slowly, on every plan. An install that
+will only ever run on Node, Deno or Bun can raise `passphraseRounds` in the
+settings table — the count is written into each stored verifier, so changing it
+leaves existing passphrases working. An install that might move to Cloudflare
+later should not: the verifiers travel with the data and would fail there,
+locking everyone out until each passphrase is reset.
 
 ## Links
 

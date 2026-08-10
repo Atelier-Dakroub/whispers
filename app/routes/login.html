@@ -24,11 +24,25 @@
    * @returns {string} a same-origin path, or `/admin`
    */
   const safeNext = (value, base) => {
+    const raw = String(value ?? '').trim();
+
+    // Nothing asked for, so nothing to resolve. Skipping this sends the empty
+    // string through `new URL('', here)`, which resolves to `here` — and since
+    // `here` is /login, signing in redirected back to the sign-in form. The
+    // session was real; the page just looked like a refusal.
+    if (!raw) return '/admin';
+
     try {
       const here = new URL(base);
-      const there = new URL(String(value ?? ''), here);
+      const there = new URL(raw, here);
 
-      return there.origin === here.origin ? there.pathname + there.search : '/admin';
+      if (there.origin !== here.origin) return '/admin';
+
+      // Same reason, for a destination that was asked for explicitly: landing
+      // on the sign-in page while signed in reads as a failure.
+      if (there.pathname === '/login' || there.pathname === '/setup') return '/admin';
+
+      return there.pathname + there.search;
     } catch {
       return '/admin';
     }

@@ -1257,6 +1257,59 @@ it('the 404 page is a file, and cannot know who is asking', async () => {
   assert.doesNotMatch(await res.text(), /Sign out/);
 });
 
+it('signing in from /login lands on the admin, not back on /login', async () => {
+  // The footer's Sign in link has no `next`, so the form posts back whatever
+  // the page put in the hidden field. That used to resolve to /login itself:
+  // the session was set and the browser was sent straight back to the sign-in
+  // form, which reads as a refusal.
+  const form = await get('/login').then((r) => r.text());
+  const posted = /name="next" value="([^"]*)"/.exec(form)?.[1];
+  assert.ok(posted, 'the form must carry a next field');
+  assert.notEqual(posted, '/login', 'the form must not point back at itself');
+
+  const landed = await post('/login', { ...FIRST, next: posted });
+  assert.equal(landed.status, 303);
+  assert.match(
+    landed.headers.get('location') ?? '',
+    /\/admin$/,
+    'a sign-in with no destination belongs on /admin',
+  );
+
+  // Asked for explicitly, it is still refused for the same reason.
+  for (const next of ['/login', '/setup']) {
+    const res = await post('/login', { ...FIRST, next });
+    assert.match(res.headers.get('location') ?? '', /\/admin$/, `next=${next}`);
+  }
+});
+
+it('passphrases are hashed at a cost workerd will actually run', async () => {
+  // workerd refuses PBKDF2 above 100,000 iterations outright — a
+  // NotSupportedError, not a slow response — on every Cloudflare plan. These
+  // tests run on Node, which happily does 600,000, so nothing else here can
+  // catch a default that makes sign-in impossible on the app's primary
+  // deployment target. It shipped that way once.
+  const WORKERD_MAX = 100_000;
+
+  const { DEFAULT_ROUNDS, encode } = await import('../app/data/passphrase.js');
+  assert.ok(
+    DEFAULT_ROUNDS <= WORKERD_MAX,
+    `DEFAULT_ROUNDS is ${DEFAULT_ROUNDS}; workerd refuses anything over ${WORKERD_MAX}`,
+  );
+
+  // The artifact, not just the constant: the count is baked into the verifier,
+  // so it is the stored string that has to be runnable wherever the data lands.
+  const rounds = Number((await encode('correct horse battery staple')).split('$')[1]);
+  assert.ok(rounds <= WORKERD_MAX, `a new verifier stores ${rounds} rounds`);
+
+  // And the setting that overrides it cannot be pushed past the same ceiling.
+  const { save } = await import('../app/data/settings.js');
+  const refused = await save({ passphraseRounds: 600_000 });
+  assert.equal(refused.ok, false, '600,000 rounds must not be accepted');
+
+  const allowed = await save({ passphraseRounds: WORKERD_MAX });
+  assert.equal(allowed.ok, true, `${WORKERD_MAX} rounds must still be allowed`);
+});
+
 it('no page that reads the database was written to a file', () => {
   const dir = path.join(root, 'dist', 'static');
   const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
