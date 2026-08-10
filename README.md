@@ -246,6 +246,27 @@ there is no database to read the setting from, so it takes its language from
 
 ## The logo, light and dark
 
+The upload is the preview box: the whole thing is a `<label>` and the file
+input lives inside it, so clicking anywhere opens the picker and the native
+control's grey "no file chosen" bar is gone.
+
+The input is still a real `<input type="file">`, clipped to a pixel rather than
+`display: none`. That distinction is the whole accessibility of the pattern —
+a hidden input is not in the accessibility tree and cannot be tabbed to, which
+is how this idiom usually locks out everybody not using a mouse. Clipped, it
+stays focusable and announced, and `:focus-within` paints the ring on the box.
+
+Two consequences worth keeping if you edit it: the Remove button sits **outside**
+the label, because a button inside one triggers the label's control; and the box
+is built from spans, because a `<label>` takes phrasing content and a `<p>`
+inside one is invalid however well it renders.
+
+The script adds what hiding the native control took away — the chosen filename,
+announced in a live region — plus an instant preview and drag-and-drop. All of
+it is additive: with the script blocked, clicking the box opens the picker and
+Save uploads.
+
+
 Two uploads. The first is used everywhere; the second is optional and is used
 on a dark background — which is what a wordmark drawn in black ink needs, since
 it disappears otherwise. With no second artwork the first is used on both.

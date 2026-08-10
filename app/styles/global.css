@@ -796,9 +796,84 @@ confirm-button {
   align-items: flex-start;
 }
 
-.logo-slot .field {
+/* The whole box is the label and therefore the click target. */
+.logo-drop {
+  position: relative;
+  display: block;
   width: 100%;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px dashed var(--rule);
+  border-radius: 4px;
+  cursor: pointer;
   margin-bottom: 0.6rem;
+}
+
+.logo-drop:hover {
+  border-color: var(--link);
+}
+
+/* The input is a pixel wide and clipped, not `display: none`, so it stays
+   focusable and in the accessibility tree. That makes the box the only thing
+   left to paint the focus ring on. */
+.logo-drop:focus-within {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+  border-color: var(--link);
+}
+
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Set by the script while a file is over the box. An attribute rather than a
+   class, so it is obvious in the DOM that something transient is going on. */
+.logo-drop[data-over='true'] {
+  border-color: var(--link);
+  border-style: solid;
+  background: var(--raised);
+}
+
+.logo-drop .swatch-title {
+  display: block;
+}
+
+.logo-drop .logo-ground {
+  display: flex;
+  margin-bottom: 0.7rem;
+}
+
+.logo-cta {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--link);
+}
+
+.logo-drop .hint {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.chosen {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+  overflow-wrap: anywhere;
+}
+
+.chosen:empty {
+  display: none;
 }
 
 /* ── breaking ─────────────────────────────────────────────────────────── */

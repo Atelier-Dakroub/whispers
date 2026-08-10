@@ -342,14 +342,14 @@ export type AdminSettingsData = {
   stacks: Stack[];
   hasLogo: boolean;
   hasLogoDark: boolean;
+  logoSrc: string | boolean;
+  logoDarkSrc: string | boolean;
   contrast: {
     where: string;
     what: string;
     lc: number;
     need: number;
   }[];
-  logoStamp: string;
-  logoDarkStamp: string;
   errors: Record<string, string>;
   complaints: string[];
   saved: boolean;

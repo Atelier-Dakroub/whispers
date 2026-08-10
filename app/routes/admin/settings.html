@@ -52,23 +52,33 @@
     const asked = new URL(url).searchParams;
     const site = await readSettings();
 
+    const hasLogo = await exists(LOGO);
+    const hasLogoDark = await exists(LOGO_DARK);
+
+    // The version query the masthead uses. Without it a replaced logo keeps
+    // showing the old one right where you went to check that it changed — these
+    // previews are cached for a year like every other request for them.
+    //
+    // `false` when there is nothing to show, so the attribute is dropped
+    // entirely: a hidden <img> still fetches its src, and an unset one would
+    // cost a 404 on every load of this page. The script fills it in when
+    // somebody picks a file.
+    const logoSrc = hasLogo ? `/logo?v=${await stamp(LOGO)}` : false;
+    const logoDarkSrc = hasLogoDark ? `/logo?dark&v=${await stamp(LOGO_DARK)}` : false;
+
     return {
       site,
       zones: ZONES,
       stacks: STACKS,
-      hasLogo: await exists(LOGO),
-      hasLogoDark: await exists(LOGO_DARK),
-      // The previews are cached for a year like every other request for them,
-      // so they need the same version query the masthead uses. Without it a
-      // replaced logo keeps showing the old one right where you went to check
-      // that it changed.
+      hasLogo,
+      hasLogoDark,
+      logoSrc,
+      logoDarkSrc,
       // Measured, not guessed. Every color here is the owner's to choose, which
       // is the feature — and it means a pair nobody can read is one click away.
       // This says so; it does not refuse. A masthead color that lands just
       // under the bar is the owner's call to make.
       contrast: audit(site),
-      logoStamp: (await stamp(LOGO)) ?? '',
-      logoDarkStamp: (await stamp(LOGO_DARK)) ?? '',
       errors,
       // Six of these fields are color wells with no room for a message under
       // them, and a form that refuses silently is worse than one that refuses
@@ -680,28 +690,54 @@
 
   <div class="logos">
     <div class="logo-slot">
-      <p class="swatch-title">For a light page</p>
-      <!-- Shown on the ground it is for, rather than on whatever the admin's
-           own theme happens to be. That is what makes a file in the wrong slot
-           obvious at a glance instead of on somebody else's screen. -->
-      <div class="logo-ground light">
-        <img if="hasLogo" src="/logo?v=${logoStamp}" alt="" class="logo" />
-        <span else class="none">Nothing uploaded</span>
-      </div>
+      <!-- The whole box is the label, so clicking anywhere in it opens the
+           picker — and the input inside is a real <input type="file">, moved
+           out of sight rather than removed.
 
-      <label class="field" for="logoFile">
-        <span class="hint">Usually the dark version of your mark. Up to ${maxKb} KB.</span>
+           Not `display: none`. A hidden input is not in the accessibility tree
+           and cannot be reached by keyboard, which is how this pattern usually
+           breaks: it looks tidy and it locks out everybody not using a mouse.
+           Clipped to a pixel keeps it focusable and announced, and
+           `:focus-within` paints the ring on the box instead.
+
+           Only spans in here — a <label> takes phrasing content, so a <p> or a
+           <div> inside one is invalid, however well it renders. -->
+      <label class="logo-drop" data-slot="logo">
+        <span class="swatch-title" id="logo-title">For a light page</span>
+
+        <span class="logo-ground light">
+          <img
+            id="logo-preview"
+            src="${logoSrc}"
+            alt=""
+            class="logo"
+            hidden="${!hasLogo}"
+          />
+          <span class="none" id="logo-empty" hidden="${hasLogo}">Nothing uploaded</span>
+        </span>
+
+        <span class="logo-cta" id="logo-cta">Choose a file, or drop one here</span>
+        <span class="hint" id="logo-hint">Usually the dark version of your mark. SVG or PNG, up to ${maxKb} KB.</span>
+
         <input
           id="logoFile"
+          class="file-input"
           form="settings"
           name="logo"
           type="file"
           accept="${accepts}"
+          aria-labelledby="logo-title logo-cta"
+          aria-describedby="logo-hint logo-chosen"
           aria-invalid="${errors.logo ? 'true' : 'false'}"
         />
-        <strong class="error" if="errors.logo">${errors.logo}</strong>
       </label>
 
+      <!-- The native input reports the chosen filename; this one cannot, being
+           out of sight. Announced politely so it is not read over whatever the
+           person was already hearing. -->
+      <span class="chosen" id="logo-chosen" aria-live="polite"></span>
+
+      <strong class="error" if="errors.logo">${errors.logo}</strong>
       <confirm-button
         if="hasLogo"
         token="logo"
@@ -715,25 +751,54 @@
     </div>
 
     <div class="logo-slot">
-      <p class="swatch-title">For a dark page</p>
-      <div class="logo-ground dark">
-        <img if="hasLogoDark" src="/logo?dark&amp;v=${logoDarkStamp}" alt="" class="logo" />
-        <span else class="none">Falls back to the one beside it</span>
-      </div>
+      <!-- The whole box is the label, so clicking anywhere in it opens the
+           picker — and the input inside is a real <input type="file">, moved
+           out of sight rather than removed.
 
-      <label class="field" for="logoDarkFile">
-        <span class="hint">Usually the light version. Optional.</span>
+           Not `display: none`. A hidden input is not in the accessibility tree
+           and cannot be reached by keyboard, which is how this pattern usually
+           breaks: it looks tidy and it locks out everybody not using a mouse.
+           Clipped to a pixel keeps it focusable and announced, and
+           `:focus-within` paints the ring on the box instead.
+
+           Only spans in here — a <label> takes phrasing content, so a <p> or a
+           <div> inside one is invalid, however well it renders. -->
+      <label class="logo-drop" data-slot="logoDark">
+        <span class="swatch-title" id="logoDark-title">For a dark page</span>
+
+        <span class="logo-ground dark">
+          <img
+            id="logoDark-preview"
+            src="${logoDarkSrc}"
+            alt=""
+            class="logo"
+            hidden="${!hasLogoDark}"
+          />
+          <span class="none" id="logoDark-empty" hidden="${hasLogoDark}">Falls back to the one beside it</span>
+        </span>
+
+        <span class="logo-cta" id="logoDark-cta">Choose a file, or drop one here</span>
+        <span class="hint" id="logoDark-hint">Usually the light version. Optional. SVG or PNG, up to ${maxKb} KB.</span>
+
         <input
           id="logoDarkFile"
+          class="file-input"
           form="settings"
           name="logoDark"
           type="file"
           accept="${accepts}"
+          aria-labelledby="logoDark-title logoDark-cta"
+          aria-describedby="logoDark-hint logoDark-chosen"
           aria-invalid="${errors.logoDark ? 'true' : 'false'}"
         />
-        <strong class="error" if="errors.logoDark">${errors.logoDark}</strong>
       </label>
 
+      <!-- The native input reports the chosen filename; this one cannot, being
+           out of sight. Announced politely so it is not read over whatever the
+           person was already hearing. -->
+      <span class="chosen" id="logoDark-chosen" aria-live="polite"></span>
+
+      <strong class="error" if="errors.logoDark">${errors.logoDark}</strong>
       <confirm-button
         if="hasLogoDark"
         token="logo-dark"
@@ -859,6 +924,73 @@
       for (const el of document.querySelectorAll(selector))
         el.hidden = !box.checked;
       touched();
+    });
+  }
+
+  // ── the logo boxes ──────────────────────────────────────────────────────
+  //
+  // Everything here is an addition. With the script blocked the box is still a
+  // label wrapping a real file input: clicking it opens the picker, tabbing
+  // reaches it, and Save uploads. What this adds is the feedback the native
+  // control gave away when its filename text went out of sight — plus the
+  // preview, and dropping.
+  for (const box of document.querySelectorAll('.logo-drop')) {
+    const input = box.querySelector('input[type=file]');
+    const slot = box.dataset.slot;
+    if (!input || !slot) continue;
+
+    const preview = document.getElementById(slot + '-preview');
+    const empty = document.getElementById(slot + '-empty');
+    const chosen = document.getElementById(slot + '-chosen');
+
+    let objectUrl = null;
+
+    const show = () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+
+      // Said in words, not only shown. `aria-live="polite"` on this element
+      // means it is read after whatever is already being spoken.
+      if (chosen) chosen.textContent = 'Chosen: ' + file.name;
+
+      if (preview) {
+        // Revoked before the next one replaces it, or every pick leaks a blob
+        // for the life of the page.
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = URL.createObjectURL(file);
+        preview.src = objectUrl;
+        preview.hidden = false;
+      }
+      if (empty) empty.hidden = true;
+
+      touched();
+    };
+
+    input.addEventListener('change', show);
+
+    // Dropping is a convenience on top of the click and keyboard paths, never
+    // instead of them: a drop target alone cannot be reached without a pointer.
+    const over = (on) => (event) => {
+      event.preventDefault();
+      box.dataset.over = String(on);
+    };
+
+    box.addEventListener('dragover', over(true));
+    box.addEventListener('dragenter', over(true));
+    box.addEventListener('dragleave', over(false));
+
+    box.addEventListener('drop', (event) => {
+      event.preventDefault();
+      box.dataset.over = 'false';
+
+      const dropped = event.dataTransfer && event.dataTransfer.files;
+      if (!dropped || !dropped.length) return;
+
+      // Assigning the FileList straight onto the input is what keeps this an
+      // ordinary form submission: no fetch, no upload endpoint, and the file
+      // travels with Save like one the picker chose.
+      input.files = dropped;
+      show();
     });
   }
 

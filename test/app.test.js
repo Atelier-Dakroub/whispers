@@ -629,6 +629,48 @@ it('a dark logo is used only when the dark background is certain', async () => {
   await post('/admin/settings', { ...base, themeMode: 'auto' }, { cookie: session });
 });
 
+it('the logo box is a label around a real file input, not a div', async () => {
+  const page = await get('/admin/settings', session).then((r) => r.text());
+
+  const labels = page.match(/<label class="logo-drop"[\s\S]*?<\/label>/g) ?? [];
+  assert.equal(labels.length, 2, 'one box per artwork');
+
+  for (const box of labels) {
+    // A real input, still posting to the settings form. The whole point of
+    // hiding it in CSS rather than replacing it with a div and a script is that
+    // it stays keyboard-reachable and announced.
+    assert.match(box, /<input[^>]*type="file"/, 'a real file input');
+    assert.match(box, /form="settings"/, 'still submits with Save');
+    assert.match(box, /class="file-input"/, 'clipped, not display:none');
+
+    // A <label> takes phrasing content. A <p> or <div> inside one is invalid
+    // however well it renders, and this box is built entirely from spans.
+    assert.doesNotMatch(box, /<(p|div)[\s>]/, 'no flow content inside the label');
+
+    // A button inside a label triggers the label's control. Remove must sit
+    // outside, or clicking it would open the file picker.
+    assert.doesNotMatch(box, /<button/, 'no button inside the label');
+
+    // Every aria reference has to resolve, or it is worse than no attribute.
+    const named = box.match(/aria-labelledby="([^"]+)"/)?.[1].split(' ') ?? [];
+    const described = box.match(/aria-describedby="([^"]+)"/)?.[1].split(' ') ?? [];
+    assert.ok(named.length >= 1 && described.length >= 1);
+
+    for (const id of [...named, ...described]) {
+      assert.match(page, new RegExp(`id="${id}"`), `#${id} must exist`);
+    }
+
+    // The accessible name must contain the visible call to action, so speaking
+    // it matches what is on screen.
+    assert.ok(named.some((id) => id.endsWith('-cta')));
+  }
+
+  // The filename readout is a live region, and it sits outside the label so it
+  // is not swallowed into the control's accessible name.
+  assert.equal((page.match(/aria-live="polite"/g) ?? []).length, 2);
+  for (const box of labels) assert.doesNotMatch(box, /aria-live/);
+});
+
 // ── pagination ─────────────────────────────────────────────────────────────
 
 it('the reader\'s pages link to each other from the head', async () => {
