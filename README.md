@@ -67,7 +67,7 @@ Same code either way. See [LICENSE.md](LICENSE.md), or
 
 ## What the owner can change
 
-Sign in and everything is under `/admin`.
+Sign in. All of the controls are below `/admin`.
 
 | | |
 | --- | --- |
@@ -76,15 +76,15 @@ Sign in and everything is under `/admin`.
 | `/admin/settings` | name, tagline, time zone, language, fonts, colors, light/dark, day headings, source, time, rules, density, headlines per page, new-tab links, how long a story stays breaking, the footer credit, logo |
 | `/admin/people` | add, remove, and reset a passphrase |
 
-A headline holds a headline, a link, an optional source, and a date. It is a
-draft or it is published; a draft is on no page and in no feed.
+An article has a headline, a link, an optional source, and a date. An article is
+a draft, or it is published. A draft is on no page and in no feed.
 
 ## The database is yours
 
-Drizzle, with the driver chosen by `DB_DRIVER`. One schema serves the whole
-SQLite family and a second serves Postgres; both are generated from
-`app/data/schema.sqlite.js` and `app/data/schema.pg.js`, which declare the same
-tables under the same names.
+The app uses Drizzle. `DB_DRIVER` selects the driver. One schema serves the
+SQLite family, and a second schema serves Postgres. The two schemas are
+`app/data/schema.sqlite.js` and `app/data/schema.pg.js`. They declare the same
+tables with the same names.
 
 | `DB_DRIVER` | `DATABASE_URL` | |
 | --- | --- | --- |
@@ -99,22 +99,23 @@ npm run db:migrate     # apply them to whatever DB_DRIVER names
 npm run db:reset -- --yes    # erase everything and start at /setup again
 ```
 
-Adding a column means editing **both** schema files in the same commit and
-running `db:generate`, which does both dialects at once for that reason.
+To add a column, edit both schema files in the same commit. Then run
+`db:generate`. That command builds the two dialects together, for this reason.
 
-Nothing above `app/data/` imports Drizzle. The routes read through
-`articles.js`, `settings.js`, `members.js` and `assets.js`, so a third dialect
-is one new schema file rather than a sweep through the app.
+No file above `app/data/` imports Drizzle. The routes read through
+`articles.js`, `settings.js`, `members.js`, and `assets.js`. A third dialect is
+therefore one new schema file, not a change through the full app.
 
 ## Accounts
 
-Each person has their own passphrase. That is the whole reason removing somebody
-works: with a shared secret, taking an address off a list is bookkeeping,
-because the person still knows the secret and can type a colleague's address.
-Here the row is the credential, and deleting it is the revocation.
+Each person has a different passphrase. This is why removal of a person works.
+With a shared secret, removal of an address is only bookkeeping: the person
+knows the secret and can type the address of a colleague. Here the row is the
+credential, and deletion of the row removes the access.
 
-A passphrase is generated when you add somebody, shown once, and stored only as
-a PBKDF2 verifier. There is no way to look one up again — reset it instead.
+The app makes a passphrase when you add a person. The app shows the passphrase
+one time. The app stores only a PBKDF2 verifier. You cannot read a passphrase
+again. Reset it instead.
 
 ```sh
 npm run member:list
@@ -122,146 +123,185 @@ npm run member:add   -- them@example.com "Their Name"
 npm run member:reset -- you@example.com
 ```
 
-`member:reset` is the way back in when the last passphrase is lost. It needs
-shell access to the server, which is the point: it is the one door that does not
-open over HTTP.
+Use `member:reset` when the last passphrase is lost. The command needs shell
+access to the server. This is intentional: it is the one door that does not open
+over HTTP.
 
-`db:reset` drops the tables rather than deleting the file, so it takes effect on
-a server that is already running — no restart, and no stale process quietly
-serving the data you thought you erased.
+`db:reset` drops the tables. It does not delete the file. The command therefore
+operates on a server that runs, and you do not restart the server. No old
+process continues to serve the data that you erased.
 
-**Passphrases are hashed at 100,000 PBKDF2 rounds, not OWASP's 600,000.** That
-is workerd's ceiling: above it Cloudflare's WebCrypto throws
-`NotSupportedError` rather than running slowly, on every plan. An install that
-will only ever run on Node, Deno or Bun can raise `passphraseRounds` in the
-settings table — the count is written into each stored verifier, so changing it
-leaves existing passphrases working. An install that might move to Cloudflare
-later should not: the verifiers travel with the data and would fail there,
-locking everyone out until each passphrase is reset.
+**The app hashes a passphrase at 100,000 PBKDF2 rounds. OWASP asks for
+600,000.** 100,000 is the limit in workerd. Above the limit, the WebCrypto of
+Cloudflare throws `NotSupportedError`. It does not become slow. This is true on
+each Cloudflare plan.
+
+An install that runs only on Node, Deno, or Bun can increase `passphraseRounds`
+in the settings table. The app writes the count into each stored verifier, so a
+change keeps the existing passphrases correct. Do not increase the count if the
+install can move to Cloudflare later. The verifiers move with the data and fail
+there. Then each person must reset a passphrase.
 
 ## Links
 
-Every submitted URL is canonicalized before it is stored: a missing scheme is
-assumed to be `https`, tracking parameters are stripped, a fragment is dropped,
-and a URL already in the table is refused as a duplicate. `http` and `https`
-only, no credentials in the URL, no private or non-public hosts.
+The app makes each URL canonical before it stores the URL:
 
-Set `GOOGLE_SAFE_BROWSING_API_KEY` and each link is also checked against Google
-Safe Browsing on the way in and on the way to being published. It is advisory:
-a match shows a warning with a **Post anyway** button, the reason is kept on the
-record, and a network failure or a missing key lets the post through. Without a
-key nothing else changes.
+- If the scheme is absent, the app uses `https`.
+- The app removes the tracking parameters.
+- The app removes the fragment.
+- The app refuses a URL that is already in the table.
+
+The app accepts `http` and `https` only. The app refuses credentials in a URL.
+The app also refuses a private host and a host that is not public.
+
+Set `GOOGLE_SAFE_BROWSING_API_KEY`. The app then checks each link against Google
+Safe Browsing. It checks the link at submission, and again before publication.
+
+The check is advisory:
+
+- A match shows a warning and a **Post anyway** button.
+- The app keeps the reason on the record.
+- A network failure lets the post through.
+- An absent key lets the post through.
+
+Without a key, nothing else changes.
 
 ## The reader's page
 
-What the owner can turn on and off: day headings, the source after a headline,
-the time a story is dated, the line between headlines, and the reading density
-— compact, normal or relaxed, which moves the line height and the space around
-each row together, because that pair is what density means to a reader.
+The owner can enable or disable these items:
 
-The time is the one with a rule behind it. Under a day heading it shows the time
-alone, because the heading already said which day. With headings off it carries
-the date as well: a bare `06:47` on a three-day-old story reads as this morning.
+- the day headings
+- the source after a headline
+- the time of a story
+- the line between the headlines
+- the reading density
 
-Colors have a **Reset colors to default** button. It resets the eight and nothing
-else — a reset that also changed the typography would be a different button.
+The density is compact, normal, or relaxed. It moves the line height and the
+space around each row together. That pair is the meaning of density to a reader.
+
+The time has one rule behind it. Below a day heading, the page shows the time
+alone, because the heading gives the day. If the headings are off, the time also
+carries the date. A bare `06:47` on a story of three days ago looks like this
+morning.
+
+The colors have a **Reset colors to default** button. It resets the eight colors
+and changes nothing else. A reset that also changed the typography must be a
+different button.
 
 ## Breaking
 
-A breaking story sits above the day headings, in its own color, under a
-`BREAKING` label — the label matters, because color alone is not a signal
-everyone receives.
+A breaking story is above the day headings. It has its own color and a
+`BREAKING` label. The label is necessary, because not every reader receives a
+color signal.
 
-It stops being breaking on its own. The column holds **when** a story was
-marked, not that it is, and the page compares that to a cutoff at render time.
-So there is no cron, no cleanup job, and no state that can get stuck: a story
-marked this morning is out of the band by evening and back in the list with
-everything else, still published, nothing lost.
+A story stops to be breaking without help. The column keeps the time when you
+marked the story. It does not keep a true or false value. The page compares that
+time to a cutoff when it renders. There is therefore no cron job, no cleanup
+job, and no state that becomes stuck. You mark a story in the morning. By the
+evening the story leaves the band and joins the list, still published, with
+nothing lost.
 
-The window is a setting, in hours. `0` keeps a story breaking until somebody
-unmarks it.
+The window is a setting, in hours. `0` keeps a story breaking until a person
+removes the mark.
 
-The reason for the expiry is not tidiness. A `BREAKING` banner that is three
-days old costs you the credibility of every future one.
+The reason for the limit is not tidiness. Readers will not trust your next
+`BREAKING` label if the last one is three days old.
 
 ## The footer credit
 
-`Powered by Whispers` renders in the footer by default, and a setting turns it
-off.
+The footer shows `Powered by Whispers` by default, and a setting removes it.
 
-Nothing enforces it. The personal license asks you to keep it and the
-commercial license does not require it — but this app promises there is no key
-to enter and nothing counting installs, and a technical lock would make that
-promise false. The admin states which license expects what, and then trusts the
-owner.
+Nothing enforces the credit. The personal license asks you to keep it. The
+commercial license does not require it. But this app promises that there is no
+key to enter and that nothing counts the installs. A technical lock would make
+that promise false. The admin states what each license expects, and then trusts
+the owner.
 
 ## Fonts
 
-Two settings, for the two roles the page has: the face headlines are set in,
-and the one labels, dates and the admin use. Both come from
-[Modern Font Stacks](https://modernfontstacks.com/) — faces already installed on
-the machine reading the page, so nothing is downloaded, nothing blocks the first
-paint, and there is no license to host.
+There are two settings, for the two roles on the page:
 
-The settings table holds a stack **id**, never a `font-family` value. An id
-cannot carry anything into a style attribute, and a stack can be corrected in
-`app/lib/fonts.js` later without touching anybody's data.
+- the face for the headlines
+- the face for the labels, the dates, and the admin
+
+Both lists come from [Modern Font Stacks](https://modernfontstacks.com/). Those
+faces are already on the machine that reads the page. The browser therefore
+downloads nothing, nothing delays the first paint, and there is no license to
+host.
+
+The settings table holds a stack **id**. It never holds a `font-family` value.
+An id cannot carry text into a style attribute. You can also correct a stack in
+`app/lib/fonts.js` later, and no data changes.
 
 ## Language and direction
 
-The locale setting decides four things, and only one of them is a translation.
+The locale setting controls four things. Only one of them is a translation.
 
-`Intl` handles three on its own, for every locale it ships: how a date is
-spelled, how a number is written, and the words *today* and *yesterday* —
-`aujourd'hui`, `أمس`, `今日`. None of those is in a table anybody maintains.
+`Intl` controls three of them, for each locale that it supports:
 
-The fourth is the eleven words the reader sees that are not the news: the skip
-link, the footer, the pager, the empty state, the not-found page. They live in
-`app/lib/strings.js`, with English, French, Spanish, German, Portuguese and
-Arabic. Adding a language is adding a key; a partial one falls back to English
-one string at a time.
+- the format of a date
+- the format of a number
+- the words *today* and *yesterday*, for example `aujourd'hui`, `أمس`, `今日`
 
-The locale also sets `lang` and `dir` on `<html>`, and every direction-sensitive
-rule in the stylesheet is logical — `margin-inline-start`, not `margin-left` —
-so an Arabic or Hebrew site mirrors with nothing else to change.
+Nobody maintains a table for those three.
 
-**The admin is English and stays English.** It is a hundred and fifty strings
-seen by one to five people who chose to install it. This file is the part a
-buyer's *audience* reads.
+The fourth is the 15 strings that the reader sees but that are not the news:
 
-**`404.html` is the exception.** It is written to a file at build time, where
-there is no database to read the setting from, so it takes its language from
-`SITE_LOCALE` in the build environment instead.
+- the skip link
+- the footer
+- the pager
+- the empty state
+- the not-found page
+
+They are in `app/lib/strings.js`, in English, French, Spanish, German,
+Portuguese, and Arabic. To add a language, add a key. An incomplete language falls back to
+English, one string at a time.
+
+The locale also sets `lang` and `dir` on `<html>`. Each direction-sensitive rule
+in the stylesheet is logical: it uses `margin-inline-start`, not `margin-left`.
+An Arabic site or a Hebrew site therefore mirrors correctly, and you change
+nothing else.
+
+**The admin is in English and stays in English.** It has approximately 150
+strings. One to five people see them, and those people selected this product.
+This file describes the part that the *audience* of a buyer reads.
+
+**`404.html` is the exception.** The build writes it to a file. At that moment
+there is no database to read the setting from. The page therefore takes its
+language from `SITE_LOCALE` in the build environment.
 
 ## The logo, light and dark
 
-The upload is the preview box: the whole thing is a `<label>` and the file
-input lives inside it, so clicking anywhere opens the picker and the native
-control's gray "no file chosen" bar is gone.
+The preview box is the upload control. The full box is a `<label>`, and the file
+input is inside it. A click anywhere therefore opens the picker, and the gray
+"no file chosen" bar of the native control is not visible.
 
-The input is still a real `<input type="file">`, clipped to a pixel rather than
-`display: none`. That distinction is the whole accessibility of the pattern —
-a hidden input is not in the accessibility tree and cannot be tabbed to, which
-is how this idiom usually locks out everybody not using a mouse. Clipped, it
-stays focusable and announced, and `:focus-within` paints the ring on the box.
+The input is a true `<input type="file">`. The CSS clips it to one pixel. The
+CSS does not set `display: none`. That difference is the accessibility of this
+pattern. A hidden input is not in the accessibility tree, and the keyboard
+cannot reach it. This idiom usually excludes each person who does not use a
+mouse. A clipped input stays focusable and stays announced, and `:focus-within`
+draws the ring on the box.
 
-Two consequences worth keeping if you edit it: the Remove button sits **outside**
-the label, because a button inside one triggers the label's control; and the box
-is built from spans, because a `<label>` takes phrasing content and a `<p>`
-inside one is invalid however well it renders.
+Keep two things if you edit this control:
 
-The script adds what hiding the native control took away — the chosen filename,
-announced in a live region — plus an instant preview and drag-and-drop. All of
-it is additive: with the script blocked, clicking the box opens the picker and
-Save uploads.
+1. The Remove button stays **outside** the label. A button inside a label
+   operates the control of that label.
+2. The box uses spans. A `<label>` accepts phrasing content, and a `<p>` inside
+   a label is invalid, even when the page looks correct.
 
+The script adds what the hidden native control removed: the name of the selected
+file, announced in a live region. The script also adds an immediate preview and
+drag-and-drop. All of it is additive. If you block the script, a click on the
+box opens the picker, and Save uploads the file.
 
-Two uploads. The first is used everywhere; the second is optional and is used
-on a dark background — which is what a wordmark drawn in black ink needs, since
-it disappears otherwise. With no second artwork the first is used on both.
+There are two uploads. The app uses the first upload everywhere. The second
+upload is optional, and the app uses it on a dark background. A wordmark in
+black ink needs the second upload, because it disappears on a dark ground. If
+there is no second artwork, the app uses the first artwork on both grounds.
 
-Which one ships depends on **who is deciding the theme**, and this is the part
-that is easy to get wrong:
+The selection depends on **who decides the theme**. This part is easy to get
+wrong.
 
 | Theme setting | Who decides | What the masthead does |
 | --- | --- | --- |
@@ -269,49 +309,50 @@ that is easy to get wrong:
 | Always dark | the site | the dark artwork, no media query |
 | Always light | the site | the main artwork, no media query |
 
-`prefers-color-scheme` is the reader's own setting; `color-scheme` on `<html>`
-is this site's. They agree only on *follow the reader*. Use the media query
-under a pinned theme and a reader whose laptop is in light mode gets the light
-artwork on a dark masthead — the exact failure the second upload exists to
-prevent. All three rows are tested.
+`prefers-color-scheme` is the setting of the reader. `color-scheme` on `<html>`
+is the setting of the site. The two agree only for *follow the reader*. Do not
+use the media query with a pinned theme. A reader whose laptop is in light mode
+then gets the light artwork on a dark masthead. That is the failure that the
+second upload prevents. The tests cover all three rows.
 
-In the admin each preview sits on the ground it is for, rather than on whatever
-the admin's own theme happens to be.
+In the admin, each preview sits on the ground that it is for. It does not sit on
+the theme of the admin.
 
 ## Contrast
 
-Every color is the owner's to choose, which is the feature — and it means a
-palette nobody can read is one click away. So the settings page measures what
-was chosen and says so, using [APCA](https://git.apcacontrast.com) rather than a
-WCAG 2 ratio: APCA accounts for polarity, so the same two colors score
-differently as a light theme and as a dark one, which is exactly the thing a
-theming feature gets wrong.
+Each color is the choice of the owner. That is the feature. It also means that
+you can select a palette that nobody can read. The settings page therefore
+measures your palette and reports the result. It uses
+[APCA](https://git.apcacontrast.com), not a WCAG 2 ratio. APCA includes
+polarity: two colors get a different score in a light theme and in a dark theme.
+A theming feature usually gets this wrong.
 
-It reports; it does not refuse. A masthead in a brand color that lands slightly
-under the bar is the owner's call, and an app that blocked it would be wrong
-about who decides.
+The page shows a warning. The page does not stop you. A masthead in a brand
+color can fall a little below the limit. That is the decision of the owner. An
+app that refused the color would be wrong about who decides.
 
-The shipped palette passes on both polarities. Two things in it did not, and
-were found by measuring rather than by looking:
+The supplied palette passes on both polarities. Two colors did not pass.
+Measurement found them; inspection did not:
 
-- `--muted` — day headings, sources, times — was mixed at one percentage for
-  both modes. That is Lc 70 on a light ground and **Lc 33** on a dark one. It is
-  now mixed per polarity, 50% and 78%.
-- `--rule`, the line between headlines, computed to **Lc 0.0** in dark mode:
-  APCA's way of saying the line was not there at all.
+- `--muted` colors the day headings, the sources, and the times. One percentage
+  served both modes. That is Lc 70 on a light ground and **Lc 33** on a dark
+  ground. The app now mixes it per polarity, at 50% and 78%.
+- `--rule` draws the line between the headlines. In dark mode it computed to
+  **Lc 0.0**. In APCA that value means the line was not there.
 
-Small text got bigger rather than darker where it was failing. Crushing a label
-to near-black to pass at 11px wins the measurement and loses the design; the fix
-for small is bigger first.
+Where small text failed, the text became larger. It did not become darker. If
+you make a label almost black to pass at 11px, you win the measurement and you
+lose the design. To correct small text, first make the text larger.
 
 ## Light and dark
 
-The six colors live in the database and reach the page as custom properties on
-`<body>`. The stylesheet resolves them with `light-dark()` over the
-`color-scheme` the theme setting puts on `<html>`.
+The eight colors are in the database. They reach the page as custom properties
+on `<body>`. The stylesheet resolves them with `light-dark()`, over the
+`color-scheme` that the theme setting puts on `<html>`.
 
-So the theme is decided before the first paint, by the browser, with no script,
-no cookie and no flash — and "follow the reader's setting" costs nothing extra.
+The browser therefore selects the theme before the first paint. There is no
+script, no cookie, and no flash. "Follow the reader's setting" costs nothing
+more.
 
 ## Deploying
 
@@ -324,12 +365,12 @@ npx wrangler secret put COOKIE_SECRET
 npm run deploy
 ```
 
-`wrangler.jsonc` points `migrations_dir` at `drizzle/sqlite`, so wrangler and
-`npm run db:migrate` apply the same SQL.
+`wrangler.jsonc` points `migrations_dir` at `drizzle/sqlite`. Wrangler and
+`npm run db:migrate` therefore apply the same SQL.
 
-Locally, `npm run start:worker` runs the real workerd with a local D1 after
-`npx wrangler d1 migrations apply whispers --local`. Use `npm run dev` for
-day-to-day work — it has hot reload and reads a local file instead.
+`npm run start:worker` runs the true workerd on a local D1. First run
+`npx wrangler d1 migrations apply whispers --local`. Use `npm run dev` for daily
+work. It has hot reload, and it reads a local file.
 
 ### Anything that runs Node
 
@@ -338,54 +379,59 @@ npm run build
 npm start
 ```
 
-Set `COOKIE_SECRET`, `DB_DRIVER` and `DATABASE_URL` in the environment.
-`.env.example` lists everything.
+Set `COOKIE_SECRET`, `DB_DRIVER`, and `DATABASE_URL` in the environment.
+`.env.example` lists each variable.
 
 ## Confirming a delete
 
-`app/elements/confirm-button.html` is a `<dialog>` opened by `command` and
-`commandfor` — the platform's own invoker. It guards deleting a headline,
-removing a member and removing the logo. There is no click handler, so no
-script and no CSP hash, and the browser supplies the backdrop, the focus trap,
-Escape to dismiss, the inert page behind, and focus returned to the button
-afterwards. Confirming submits an ordinary form.
+`app/elements/confirm-button.html` is a `<dialog>`. The attributes `command` and
+`commandfor` open it, and they are the invoker of the platform. The dialog
+protects three operations: deletion of a headline, removal of a member, and
+removal of the logo.
 
-Its `token` prop becomes the dialog's id. It is not called `key`, because `key`
-is one of the framework's directives — the compiler takes the attribute and the
-prop arrives empty, which gives every dialog on the page the same id.
+There is no click handler, so there is no script and no CSP hash. The browser
+supplies the backdrop, the focus trap, Escape to dismiss, the inert page behind,
+and the return of the focus to the button. Confirmation submits an ordinary
+form.
 
-Invoker commands shipped across all three engines during 2025. On anything
-older the button does nothing, so the delete is unreachable rather than
-unguarded — the safe direction, but worth knowing.
+The `token` prop becomes the id of the dialog. The prop is not `key`, because
+`key` is a directive of the framework. The compiler takes that attribute, and
+the prop arrives empty. Each dialog on the page then has the same id.
+
+The three engines shipped invoker commands during 2025. On older software the
+button does nothing. The delete is therefore unreachable, not unguarded. That is
+the safe direction, but you must know it.
 
 ## Three things worth knowing before editing
 
-**Every action under `admin/` begins with `member(ctx)`** from
+**Each action below `admin/` starts with `member(ctx)`** from
 `app/lib/guard.js`. Core 0.10.0 runs the layout guards before the action, so
-`admin/_layout.html` already turns a signed-out POST away and these calls are
-belt and braces — kept because the cost is a line and the failure they prevent
-is a silent unauthenticated write, and because a second check survives a page
-being moved out from under its guarding layout. `test/app.test.js` asserts a
-signed-out POST to every admin route is refused.
+`admin/_layout.html` refuses a signed-out POST already. The call in each action
+is a second check. Keep it: it costs one line, and it prevents a silent
+unauthenticated write. It also stays correct if somebody moves a page out from
+below its layout. `test/app.test.js` tests that the app refuses a signed-out
+POST to each admin route.
 
 **A page that reads the database needs `export const prerender = false`.** The
-build renders on a machine with no binding, and would otherwise write a snapshot
-that never changes again. `404.html` is the exception: it is always written to a
-file, so it has no loader, and every repository answers with defaults when no
-database is wired — which is what makes `npm run build` work in CI.
+build runs on a machine with no binding. Without that line the build writes a
+snapshot, and the page never changes again. `404.html` is the exception. The
+build always writes it to a file, so it has no loader, and each repository
+answers with the defaults when no database is present. This is why
+`npm run build` works in CI.
 
-**`vite.config.js` pins `build.cssTarget`, and it is load-bearing.** Below
-those versions LightningCSS rewrites every `light-dark()` into a polyfill whose
-switch variables it does not emit, so the value becomes invalid — and an invalid
-`var()` inside a shorthand voids the whole declaration. `border: 1px solid
-var(--rule)` silently becomes no border, and the palette goes with it. Nothing
-in the CSS is wrong when this happens, which is what makes it hard to find.
-`npm test` checks the built stylesheet for it.
+**`vite.config.js` pins `build.cssTarget`, and that line is necessary.** Below
+those versions, LightningCSS rewrites each `light-dark()` into a polyfill. It
+does not emit the switch variables for that polyfill, so the value becomes
+invalid. An invalid `var()` inside a shorthand voids the full declaration.
+`border: 1px solid var(--rule)` then becomes no border, and the palette fails
+with it. Nothing in the CSS is wrong when this happens, and that makes the fault
+hard to find. `npm test` examines the built stylesheet for it.
 
 ## Versions
 
-Releases are tagged, and [CHANGELOG.md](CHANGELOG.md) says what changed and
-whether it needs a migration. To upgrade: pull or download the release, then
+The releases have tags. [CHANGELOG.md](CHANGELOG.md) gives the changes, and it
+tells you when a version needs a migration. To upgrade, pull the changes or
+download the release. Then run these commands:
 
 ```sh
 npm install
@@ -403,16 +449,17 @@ npm run db:migrate
 | `npm run start:worker` | the real workerd, on local D1 |
 | `npm run deploy` | build and ship to Cloudflare |
 
-The reader's page is cached for a minute and dropped by tag whenever anything is
-edited, so an edit shows at once. On Workers that cache is per-isolate: an edit
-clears the isolate that served it, and the others catch up within the minute.
+The app caches the reader's page for one minute. An edit drops that cache by
+tag, so a change is visible immediately. On Workers the cache belongs to one
+isolate. An edit clears the isolate that served the request, and the other
+isolates become correct within the minute.
 
-`npm audit` reports four moderate advisories, all of them in build-time
-tooling — `npm audit --omit=dev` reports none. Nothing there is in the app or
-is deployed.
+`npm audit` reports four moderate advisories. All of them are in build-time
+tools, and `npm audit --omit=dev` reports none. That code is not in the app, and the
+deploy does not include it.
 
-`wrangler.demo.jsonc` is the config behind the public demo at
-[demo.whispers.news](https://demo.whispers.news), kept in the repository as a
-worked example of `wrangler.jsonc` with its placeholders filled in. Its `npm run
-deploy:demo` and `db:migrate:demo` scripts point at a database you do not have;
-they are there to be read, not run.
+`wrangler.demo.jsonc` is the configuration of the public demo at
+[demo.whispers.news](https://demo.whispers.news). The repository keeps it as a
+worked example of `wrangler.jsonc` with the placeholders filled in. Its
+`npm run deploy:demo` and `db:migrate:demo` scripts use a database that you do
+not have. Read those scripts; do not run them.
