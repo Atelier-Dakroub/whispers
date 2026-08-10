@@ -6,6 +6,9 @@ dist
 !.env.test
 .DS_Store
 
-data/
+# Anchored. Unanchored, `data/` matches a directory named data at any depth —
+# which quietly excluded app/data/, the whole repository layer, from every
+# commit. The clone built for nobody but the machine it was written on.
+/data/
 .wrangler/
 .dev.vars
