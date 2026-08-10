@@ -1,13 +1,9 @@
-// Cloudflare Workers entry. `npm run deploy` sends it.
+// Cloudflare Workers entry, sent by `npm run deploy`, and where the database is
+// wired for workerd — the job `db.node.js` does for Node.
 //
-// This file belongs to the app, because every import in it names something the
-// app owns and a bundler needs a literal path to follow.
-//
-// It is also where the database is wired for workerd, the same job
-// `db.node.js` does for Node. `env` exists only inside a request, so the store
-// is filled on the first one and left in place: `env` is one object for the
-// life of the isolate, so holding it is safe in a way that holding a `Request`
-// would not be.
+// `env` exists only inside a request, so the store is filled on the first one
+// and left in place. That is safe because `env` is one object for the life of
+// the isolate, which a `Request` is not.
 
 import { workerFrom } from '@transclude/core/worker';
 import { drizzle } from 'drizzle-orm/d1';
@@ -22,10 +18,14 @@ const app = workerFrom({ config, manifest, entry, bundle });
 
 export default {
   /**
+   * Wires the database on the first request, then serves.
+   *
    * @param {Request} request
    * @param {{ DB: any, COOKIE_SECRET?: string, SITE_URL?: string,
    *   GOOGLE_SAFE_BROWSING_API_KEY?: string }} env
    * @param {any} ctx
+   * @returns {Response|Promise<Response>}
+   * @throws when no D1 binding named DB is configured
    */
   fetch(request, env, ctx) {
     if (!store()) {
@@ -39,10 +39,9 @@ export default {
       setDb({ db: drizzle(env.DB), tables, dialect: 'sqlite' });
     }
 
-    // `app/data/link-check.js` and `app/server.js` read `process.env`, which
-    // workerd provides only with the `nodejs_compat` flag and then only for
-    // vars it knows about. Copying the two optional ones across means those
-    // modules need no branch for this runtime.
+    // link-check.js and server.js read `process.env`, which workerd fills only
+    // for vars it knows about. Copying these two across means neither module
+    // needs a branch for this runtime.
     if (globalThis.process?.env) {
       if (env.SITE_URL) globalThis.process.env.SITE_URL ??= env.SITE_URL;
       if (env.GOOGLE_SAFE_BROWSING_API_KEY) {

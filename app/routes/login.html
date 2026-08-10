@@ -1,5 +1,5 @@
 <script server>
-  import { count, signIn } from '../data/members.js';
+  import { count, sessionValue, signIn } from '../data/members.js';
   import { check, fail, keyFor, reset } from '../lib/throttle.js';
 
   export const prerender = false;
@@ -14,13 +14,24 @@
   /**
    * A path this site owns, or the admin.
    *
-   * `new URL(next, url)` on a value straight from a form is an open redirect:
-   * `//evil.example` and `https://evil.example` both resolve to another origin,
-   * and the visitor would arrive there having been sent by us.
+   * Resolved and origin-checked rather than pattern-matched. `/\\evil.example`
+   * passes a `startsWith('//')` test and still lands on another host, because
+   * the URL parser reads a backslash as a slash — so the only reliable question
+   * is what the value actually resolves to.
+   *
+   * @param {unknown} value straight from the form or the query string
+   * @param {string} base the current request URL
+   * @returns {string} a same-origin path, or `/admin`
    */
-  const safeNext = (value) => {
-    const next = String(value ?? '');
-    return next.startsWith('/') && !next.startsWith('//') ? next : '/admin';
+  const safeNext = (value, base) => {
+    try {
+      const here = new URL(base);
+      const there = new URL(String(value ?? ''), here);
+
+      return there.origin === here.origin ? there.pathname + there.search : '/admin';
+    } catch {
+      return '/admin';
+    }
   };
 
   export default async ({ action, url }) => {
@@ -30,14 +41,14 @@
     return {
       error: action?.error ?? null,
       email: action?.email ?? '',
-      next: safeNext(new URL(url).searchParams.get('next')),
+      next: safeNext(new URL(url).searchParams.get('next'), url),
     };
   };
 
   export const POST = async ({ cookies, request, url }) => {
     const form = await request.formData();
     const email = String(form.get('email') ?? '');
-    const next = safeNext(form.get('next'));
+    const next = safeNext(form.get('next'), url);
 
     const key = keyFor(request, email);
     const gate = check(key);
@@ -61,9 +72,13 @@
 
     reset(key);
 
-    // Signed, so the browser can read the id and cannot invent one. Everything
-    // else about the member stays on the server.
-    await cookies.signed.set('session', member.id, SESSION);
+    // Signed, so the browser cannot invent one. The value carries a fingerprint
+    // of the stored verifier as well as the id, so changing a passphrase ends
+    // every session opened with the old one.
+    const session = await sessionValue(member.id);
+    if (!session) return { error: 'Those do not match an account.', email };
+
+    await cookies.signed.set('session', session, SESSION);
 
     return Response.redirect(new URL(next, url), 303);
   };

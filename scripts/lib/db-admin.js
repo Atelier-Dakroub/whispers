@@ -1,23 +1,30 @@
-// The bits `scripts/migrate.js` and `scripts/reset.js` share.
+// What `scripts/migrate.js` and `scripts/reset.js` share.
 //
-// They live in a function rather than in a chained npm script because
-// `npm run db:reset -- --yes` appends its arguments to the *end* of the whole
-// script string. Chain two commands with `&&` and the flag lands on the second
-// one, so the reset reads no `--yes`, refuses, and the migrate that follows
-// succeeds — which looks exactly like a reset that worked and did nothing.
+// Functions rather than a chained npm script, because `npm run db:reset --
+// --yes` appends its arguments to the end of the whole string: chained, the
+// flag lands on the migrate, the reset refuses, and the migrate succeeds —
+// which looks exactly like a reset that worked.
 
 import process from 'node:process';
 
+/** @returns {string} the DB_DRIVER value, or the default */
 export const driver = () => process.env.DB_DRIVER ?? 'libsql';
 
+/** @returns {string} the libSQL connection URL */
 export const sqliteUrl = () => process.env.DATABASE_URL ?? 'file:./data/whispers.db';
 
+/** @returns {string|null} the path, or null when the URL is remote */
 export const sqliteFile = () => {
   const url = sqliteUrl();
   return url.startsWith('file:') ? url.slice('file:'.length) : null;
 };
 
-/** The directory has to exist before a file database can be opened in it. */
+/**
+ * Makes the directory a file database will live in, since libSQL will not.
+ *
+ * @param {string} file
+ * @returns {Promise<void>}
+ */
 export async function ensureDir(file) {
   const fs = await import('node:fs');
   const path = await import('node:path');
@@ -28,6 +35,7 @@ export async function ensureDir(file) {
  * Applies every pending migration to whatever `DB_DRIVER` names.
  *
  * @returns {Promise<string>} what was migrated, for the caller to print
+ * @throws when the driver is D1, unknown, or missing its package
  */
 export async function applyMigrations() {
   const name = driver();
@@ -94,6 +102,7 @@ export async function applyMigrations() {
  * Removes every table this app owns, so `applyMigrations` rebuilds them.
  *
  * @returns {Promise<string>} what was emptied
+ * @throws when the driver is D1 or unknown
  */
 export async function dropEverything() {
   const name = driver();
@@ -108,13 +117,10 @@ export async function dropEverything() {
   }
 
   if (name === 'libsql' || name === 'turso' || name === 'better-sqlite3') {
-    // Tables are dropped rather than the file deleted, even for a local file.
-    //
-    // Deleting it looks tidier and is wrong while anything is running: a server
-    // that already opened the file keeps its handle on the unlinked inode and
-    // goes on serving the data that was supposedly erased, until it restarts.
-    // That cost an hour once. Dropping through SQL reaches the same file every
-    // other connection is holding.
+    // Tables dropped rather than the file deleted, even for a local file: a
+    // server that already opened it keeps a handle on the unlinked inode and
+    // goes on serving the data you thought you erased. SQL reaches the same
+    // file every other connection is holding.
     const url =
       name === 'better-sqlite3'
         ? `file:${process.env.DATABASE_URL ?? './data/whispers.db'}`
@@ -126,8 +132,8 @@ export async function dropEverything() {
     const { createClient } = await import('@libsql/client');
     const client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN });
 
-    // The bookkeeping table goes too, or the migration below thinks it has
-    // already run and leaves a database with no tables in it.
+    // The bookkeeping table goes too, or the migration thinks it has already
+    // run and leaves a database with no tables in it.
     for (const table of [...TABLES, '__drizzle_migrations']) {
       await client.execute(`drop table if exists ${table}`);
     }

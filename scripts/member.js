@@ -4,17 +4,13 @@
 //   npm run member:reset -- ada@example.com     new passphrase, printed once
 //   npm run member:add   -- new@example.com "Their Name"
 //
-// This is the way back when the last account's passphrase is lost. Without it
-// the only answer would be erasing the database, which is a strange thing to
-// have to do to a live site because somebody forgot a word.
+// The way back when the last passphrase is lost, short of erasing the database.
+// It needs shell access, which is the point: the one door that does not open
+// over HTTP.
 //
-// It needs shell access to the server, which is the point: it is the one door
-// that does not open over HTTP.
-//
-// On Cloudflare there is no shell, so reach the same rows through D1:
-//   npx wrangler d1 execute whispers --remote --command "select email from members"
-// and delete the row to hand the site back to /setup, or use this script
-// locally against the same Turso/Postgres URL.
+// Cloudflare has no shell, so reach the same rows through D1 —
+// `npx wrangler d1 execute whispers --remote --command "select email from
+// members"` — or run this locally against the same Turso or Postgres URL.
 
 import process from 'node:process';
 import './../db.node.js';
@@ -22,6 +18,12 @@ import { add, list, resetPassphrase } from '../app/data/members.js';
 
 const [command, ...rest] = process.argv.slice(2);
 
+/**
+ * Prints a member list, or says there is none.
+ *
+ * @param {{ email: string, name: string }[]} people
+ * @returns {void}
+ */
 const show = (people) => {
   if (!people.length) {
     console.log('Nobody yet. The next visitor to /setup claims the site.');

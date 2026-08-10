@@ -1,12 +1,8 @@
 // Headlines, grouped into days.
 //
-// A day is not a property of a timestamp; it is a property of a timestamp and a
-// place. Two headlines an hour apart can fall on different days in Auckland and
-// the same day in Lisbon. So the site carries a timezone setting and everything
-// here takes it.
-//
-// `Intl` does the work. Node, Bun, Deno and workerd all ship full ICU, so the
-// same zone and the same locale give the same answer on all four.
+// A day is a property of a timestamp *and a place*: two headlines an hour apart
+// fall on different days in Auckland and the same day in Lisbon. So every
+// function here takes the site's timezone, and `Intl` does the arithmetic.
 
 /**
  * @typedef {object} Day
@@ -16,7 +12,13 @@
  * @property {any[]} items
  */
 
-/** `formatToParts` rather than `format`, so the pieces are not locale-ordered. */
+/**
+ * A formatter's output as named pieces rather than an ordered string.
+ *
+ * @param {Intl.DateTimeFormat} formatter
+ * @param {Date} date
+ * @returns {Record<string, string>}
+ */
 const partsOf = (formatter, date) =>
   Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
 
@@ -42,12 +44,12 @@ export function dayKey(date, timezone) {
 }
 
 /**
- * Groups articles into days, keeping the order they arrived in.
+ * Groups articles into days, newest first.
  *
- * The caller has already sorted them newest first, so the days come out newest
- * first too and nothing here has to sort again.
+ * Keeps the order it was given, so the caller's sort decides the result and
+ * nothing here sorts again.
  *
- * @param {{ publishedAt: string }[]} items
+ * @param {{ publishedAt: string }[]} items already sorted newest first
  * @param {{ timezone: string, locale: string, today?: Date }} options
  * @returns {Day[]}
  */
@@ -63,10 +65,9 @@ export function byDay(items, { timezone, locale, today = new Date() }) {
   const nowKey = dayKey(today, timezone);
   const yesterdayKey = dayKey(new Date(today.getTime() - 86_400_000), timezone);
 
-  // Not a translated string. `numeric: 'auto'` is what turns "in 0 days" into
-  // the word a language actually uses — aujourd'hui, أمس, gestern — for every
-  // locale ICU ships, which is far more than anyone would hand-translate. The
-  // day heading is uppercased by CSS, so the lowercase ICU gives back is right.
+  // `numeric: 'auto'` turns "in 0 days" into the word a language actually uses
+  // — aujourd'hui, أمس, gestern — for every locale ICU ships, which is many
+  // more than a translation table would carry.
   const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
 
   /** @type {Map<string, Day>} */
@@ -80,9 +81,8 @@ export function byDay(items, { timezone, locale, today = new Date() }) {
     let day = days.get(key);
 
     if (!day) {
-      // Midday, not midnight: a `datetime` of `2026-08-08T00:00:00Z` is the
-      // previous evening in the Americas, and a reader's browser would show the
-      // heading's own date as the day before.
+      // Midday, not midnight: `T00:00:00Z` is the previous evening in the
+      // Americas, and a browser would show the heading's own date as yesterday.
       const iso = `${key}T12:00:00.000Z`;
       const label =
         key === nowKey
@@ -104,14 +104,12 @@ export function byDay(items, { timezone, locale, today = new Date() }) {
 /**
  * The stamp beside a headline.
  *
- * `withDate` when the page has no day headings above the list. A bare `06:47`
- * is only meaningful under a heading that says which day it is; on a flat list
- * it reads as this morning whatever day the story is from, which is worse than
- * showing nothing.
+ * Pass `withDate` when the page has no day headings, because a bare `06:47`
+ * reads as this morning whatever day the story is from.
  *
  * @param {string} iso
  * @param {{ timezone: string, locale: string, withDate?: boolean }} options
- * @returns {string}
+ * @returns {string} empty when the timestamp will not parse
  */
 export function timeOfDay(iso, { timezone, locale, withDate = false }) {
   const at = new Date(iso);
@@ -126,16 +124,15 @@ export function timeOfDay(iso, { timezone, locale, withDate = false }) {
 }
 
 /**
- * An ISO timestamp for a `datetime-local` input, in the site's zone.
+ * An instant as wall-clock text for a `datetime-local` input.
  *
- * The input has no zone of its own: it shows and returns wall-clock text. So
- * the value has to be shifted into the site's zone on the way out and back on
- * the way in, or an editor in Beirut and one in Boston would write different
+ * The input has no zone of its own, so the value is shifted into the site's —
+ * otherwise an editor in Beirut and one in Boston would write different
  * instants from the same typed string.
  *
  * @param {string} iso
  * @param {string} timezone
- * @returns {string} `YYYY-MM-DDTHH:mm`
+ * @returns {string} `YYYY-MM-DDTHH:mm`, or empty if the input will not parse
  */
 export function toLocalInput(iso, timezone) {
   const at = new Date(iso);
@@ -154,8 +151,8 @@ export function toLocalInput(iso, timezone) {
     at,
   );
 
-  // `en-CA` gives hour 24 for midnight rather than 00, which is a valid clock
-  // reading and not a valid input value.
+  // `en-CA` reports midnight as hour 24, which is a valid clock reading and not
+  // a valid input value.
   const hour = parts.hour === '24' ? '00' : parts.hour;
 
   return `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}`;
@@ -164,10 +161,10 @@ export function toLocalInput(iso, timezone) {
 /**
  * The instant a `datetime-local` value names in the site's zone.
  *
- * Read the wall-clock text as if it were UTC, then ask what that zone's clock
- * said at that instant, and the difference is the offset to remove. Done twice,
- * because the offset itself can change across the shift — the hour either side
- * of a daylight-saving boundary is the case that catches a single pass.
+ * Reads the text as if it were UTC, asks what that zone's clock said at that
+ * instant, and removes the difference. Done twice because the offset itself can
+ * change across the shift, which is what catches the hour either side of a
+ * daylight-saving boundary.
  *
  * @param {string} value `YYYY-MM-DDTHH:mm`
  * @param {string} timezone

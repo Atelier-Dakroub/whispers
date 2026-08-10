@@ -1,16 +1,10 @@
-// The font stacks the owner can choose between.
+// The font stacks the owner can choose between, verbatim from
+// modernfontstacks.com — faces already installed on the machines people read
+// on, so nothing is downloaded and nothing blocks the first paint.
 //
-// Verbatim from modernfontstacks.com, which picks faces already installed on
-// the machines people read on. No web font is downloaded, nothing blocks the
-// first paint, and there is no license to buy or host. For a page that is a
-// list of links, a font request would be a large fraction of the page weight
-// for no reading benefit.
-//
-// The database stores an `id` from this list, never a font-family value. Two
-// reasons, and the second is the one that matters: a stored CSS value is a
-// string from a form on its way into a style attribute, which is a thing to
-// have to be careful about forever; and an id means a stack can be corrected
-// here later without touching anybody's data.
+// The database stores an `id` from this list, never a font-family value. That
+// keeps a form value out of a style attribute, and it means a stack can be
+// corrected here later without touching anybody's data.
 
 /**
  * @typedef {object} Stack
@@ -96,11 +90,16 @@ export const STACKS = [
 
 const BY_ID = new Map(STACKS.map((stack) => [stack.id, stack]));
 
-/** Whether a stored value still names a stack. */
+/**
+ * Whether a stored value still names a stack.
+ *
+ * @param {string} id
+ * @returns {boolean}
+ */
 export const isStack = (id) => BY_ID.has(String(id));
 
 /**
- * The stack an id names, or the fallback.
+ * The stack an id names, or the fallback, or the first stack.
  *
  * @param {string} id
  * @param {string} fallback an id, not a stack
@@ -112,5 +111,5 @@ export const stackOf = (id, fallback) =>
 /** A newspaper reads better in a text face than in the interface one. */
 export const DEFAULT_HEADLINE = 'transitional';
 
-/** Labels, datelines, and the whole admin. The reader's own system face. */
+/** Labels, datelines and the whole admin, in the reader's own system face. */
 export const DEFAULT_INTERFACE = 'system-ui';

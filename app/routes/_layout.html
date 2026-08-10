@@ -40,10 +40,10 @@
 
 <html lang="${lang}" dir="${dir}" style="color-scheme: ${scheme}" />
 
-<!-- Six custom properties, set from the database on every render.
-     `${…}` inside a <style> block is a compile error — text there reaches the
-     page as written, so a value would land in code. An attribute is the way
-     through, and an attribute is escaped. -->
+<!-- The palette, the fonts and the density, set from the database on every
+     render. `${…}` inside a <style> block is a compile error — text there
+     reaches the page as written, so a value would land in code. An attribute is
+     the way through, and an attribute is escaped. -->
 <body
   style="--bg-l: ${site.bgLight}; --ink-l: ${site.inkLight}; --link-l: ${site.linkLight}; --bg-d: ${site.bgDark}; --ink-d: ${site.inkDark}; --link-d: ${site.linkDark}; --font-head: ${headline}; --font-ui: ${ui}; --leading: ${density.leading}; --row-pad: ${density.pad}; --headline-rule: ${rule}; --flash-l: ${site.breakingLight}; --flash-d: ${site.breakingDark}"
 />
@@ -54,18 +54,10 @@
 
 <header class="masthead">
   <a class="wordmark" href="/">
-    <!-- Which artwork, and who decides. This is the whole subtlety of a second
-         logo, and it is easy to get wrong in a way that only shows on somebody
-         else's machine.
-
-         `prefers-color-scheme` is the reader's own setting. `color-scheme` on
-         <html> is this site's. The two agree only when the theme is automatic,
-         so the media query is used only then. Pin the site to dark and a reader
-         whose laptop is in light mode would otherwise be handed the light
-         artwork on a dark masthead: the exact failure the second upload exists
-         to prevent.
-
-         Automatic asks the reader. A pinned theme asks nobody. -->
+    <!-- `prefers-color-scheme` is the reader's setting; `color-scheme` on
+         <html> is this site's. They agree only when the theme is automatic, so
+         the media query is used only then — a site pinned to dark must not hand
+         the light artwork to a reader whose laptop is in light mode. -->
     <picture if="logo && logoDark && site.themeMode === 'auto'">
       <source media="(prefers-color-scheme: dark)" srcset="/logo?dark&amp;v=${logoDark}" />
       <img src="/logo?v=${logo}" alt="${site.title}" class="logo" />
@@ -92,12 +84,10 @@
   <a href="/feed.xml">${s.feed}</a>
   <a href="/login">${s.signIn}</a>
 
-  <!-- On by default, and a setting can turn it off.
-       Not enforced, deliberately. The licence asks a personal site to keep it,
-       and the product's own promise is that there is no key to enter and
-       nothing counting installs — so a technical lock here would make that
-       promise false. The admin says which licence expects what, and then
-       trusts the owner. -->
+  <!-- On by default, off with a setting, and deliberately not enforced: the
+       promise is that there is no key to enter and nothing counting installs,
+       which a technical lock here would make false. The admin says what each
+       license expects and trusts the owner. -->
   <a class="credit" if="site.credit" href="https://whispers.news" rel="noopener">
     ${s.poweredBy}
   </a>

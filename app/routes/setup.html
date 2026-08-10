@@ -1,5 +1,5 @@
 <script server>
-  import { add, count, signIn } from '../data/members.js';
+  import { add, count, sessionValue, signIn } from '../data/members.js';
 
   export const prerender = false;
 
@@ -44,8 +44,10 @@
     // Straight in, rather than bouncing to a sign-in form they would fill with
     // what they just typed.
     const member = await signIn(email, passphrase);
-    if (member) {
-      await cookies.signed.set('session', member.id, {
+    const session = member && (await sessionValue(member.id));
+
+    if (session) {
+      await cookies.signed.set('session', session, {
         httpOnly: true,
         sameSite: 'Lax',
         path: '/',

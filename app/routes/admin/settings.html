@@ -10,7 +10,9 @@
     write,
   } from "../../data/assets.js";
   import {
+    COLORS,
     DEFAULTS,
+    FIELDS,
     FLAGS,
     all as readSettings,
     save,
@@ -25,26 +27,6 @@
   // a free-text box: a mistyped zone is a site whose days are grouped wrongly
   // and nothing says why.
   const ZONES = Intl.supportedValuesOf("timeZone");
-
-  /** The text and number inputs on this form, by name. */
-  const FIELDS = [
-    "title",
-    "tagline",
-    "timezone",
-    "locale",
-    "themeMode",
-    "bgLight",
-    "inkLight",
-    "linkLight",
-    "bgDark",
-    "inkDark",
-    "linkDark",
-    "fontHeadline",
-    "fontInterface",
-    "density",
-    "perPage",
-    "breakingHours",
-  ];
 
   export default async ({ action, url }) => {
     /** @type {Record<string, string>} */
@@ -111,17 +93,10 @@
     const intent = String(form.get("intent") ?? "save");
 
     if (intent === "reset-colors") {
-      // Only the six. Fonts, density and the rest of the form are left where
-      // they are: "reset colors" that also reset the typography would be a
+      // Only the colors. Fonts, density and the rest of the form stay where
+      // they are: a "reset colors" that also reset the typography would be a
       // different button.
-      await save({
-        bgLight: DEFAULTS.bgLight,
-        inkLight: DEFAULTS.inkLight,
-        linkLight: DEFAULTS.linkLight,
-        bgDark: DEFAULTS.bgDark,
-        inkDark: DEFAULTS.inkDark,
-        linkDark: DEFAULTS.linkDark,
-      });
+      await save(Object.fromEntries(COLORS.map((key) => [key, DEFAULTS[key]])));
       revalidateTag("articles");
       // The fragment is why this needs no script: a redirect can say where to
       // land, and the browser scrolls there itself. Without it the page comes
@@ -149,7 +124,6 @@
     for (const name of FIELDS) {
       if (form.has(name)) patch[name] = form.get(name);
     }
-    if ("perPage" in patch) patch.perPage = Number(patch.perPage);
 
     // An unticked checkbox sends nothing at all, so the markup pairs it with a
     // hidden field of the same name carrying `0`. The form then always states
@@ -469,15 +443,10 @@
       </label>
     </div>
 
-    <!-- The preview is the site's own markup and the site's own classes, so it
-         is the thing itself rather than a drawing of it: the same day heading,
-         the same headline row, the same pager. It sits between the two controls
-         that change it.
-
-         Every value in it is a token — `var(--font-head)`, `var(--bg)` — never
-         a literal. That is what lets one script write one custom property and
-         have all of this follow. A literal font-family here is what made the
-         headline sit still while the select changed. -->
+    <!-- The site's own markup and classes, so this is the thing itself rather
+         than a drawing of it. Every value in it is a token and never a literal,
+         which is what lets one script write one property and have all of this
+         follow. -->
     <div class="preview" aria-label="Preview">
       <p class="day-heading"><time>Monday, August 9, 2026</time></p>
 
@@ -672,14 +641,10 @@
 
   </form>
 
-  <!-- The logo section sits outside the settings form, and its two file inputs
-       reach back into it with `form="settings"`. That is the whole reason it is
-       out here: a Remove is a `confirm-button`, a `confirm-button` carries its
-       own <form>, and a form inside a form is not markup — so the alternative
-       was the removes stranded at the bottom of the page, a long way from the
-       thing they remove.
-
-       The `form` attribute costs nothing and keeps Save doing what it did. -->
+  <!-- Outside the settings form, with the file inputs reaching back in through
+       `form="settings"`. A Remove is a `confirm-button`, which carries its own
+       <form>, and a form inside a form is not markup — so the alternative was
+       the removes stranded at the bottom of the page. -->
   <h2 id="logo">Logo</h2>
 
   <p class="lede">
@@ -690,18 +655,10 @@
 
   <div class="logos">
     <div class="logo-slot">
-      <!-- The whole box is the label, so clicking anywhere in it opens the
-           picker — and the input inside is a real <input type="file">, moved
-           out of sight rather than removed.
-
-           Not `display: none`. A hidden input is not in the accessibility tree
-           and cannot be reached by keyboard, which is how this pattern usually
-           breaks: it looks tidy and it locks out everybody not using a mouse.
-           Clipped to a pixel keeps it focusable and announced, and
-           `:focus-within` paints the ring on the box instead.
-
-           Only spans in here — a <label> takes phrasing content, so a <p> or a
-           <div> inside one is invalid, however well it renders. -->
+      <!-- The whole box is the label, and the input inside is a real
+           <input type="file"> clipped to a pixel rather than hidden: a
+           `display: none` input is not in the accessibility tree and cannot be
+           tabbed to. Spans only, because a <label> takes phrasing content. -->
       <label class="logo-drop" data-slot="logo">
         <span class="swatch-title" id="logo-title">For a light page</span>
 
@@ -751,18 +708,6 @@
     </div>
 
     <div class="logo-slot">
-      <!-- The whole box is the label, so clicking anywhere in it opens the
-           picker — and the input inside is a real <input type="file">, moved
-           out of sight rather than removed.
-
-           Not `display: none`. A hidden input is not in the accessibility tree
-           and cannot be reached by keyboard, which is how this pattern usually
-           breaks: it looks tidy and it locks out everybody not using a mouse.
-           Clipped to a pixel keeps it focusable and announced, and
-           `:focus-within` paints the ring on the box instead.
-
-           Only spans in here — a <label> takes phrasing content, so a <p> or a
-           <div> inside one is invalid, however well it renders. -->
       <label class="logo-drop" data-slot="logoDark">
         <span class="swatch-title" id="logoDark-title">For a dark page</span>
 
@@ -821,16 +766,11 @@
   </div>
 </div>
 
-<!-- The only script in this app, and it is behind the sign-in.
-     The reader's page ships none: the theme, the fonts and the colors all
-     arrive as custom properties the server wrote, resolved before the first
-     paint. This is the admin, where a form ought to show you what it is about
-     to do, and there is no way to preview a color without running something.
-
-     It is an enhancement and nothing depends on it. With the script blocked the
-     page works exactly as it did: the preview shows what is saved, and Save
-     applies. It writes the same properties the layout writes, so the preview is
-     the real thing rather than an impression of it. -->
+<!-- The only script in this app, and it is behind the sign-in — the reader's
+     page ships none. Everything here is an enhancement: with it blocked the
+     preview still shows what is saved and Save still applies. It writes the
+     same custom properties the layout writes, so the preview is the real
+     thing. -->
 <script>
   const form = document.getElementById("settings");
   const unsaved = document.getElementById("unsaved");
@@ -952,19 +892,11 @@
       if (chosen) chosen.textContent = 'Chosen: ' + file.name;
 
       if (preview) {
-        // A data URL, not `URL.createObjectURL`.
-        //
-        // An object URL is the better mechanism — no base64, and revocable —
-        // but it produces a `blob:` URL, and this app's Content-Security-Policy
-        // allows images from `'self'` and `data:` only. The preview was being
-        // blocked silently: the filename appeared and the picture never did.
-        //
-        // Widening the policy would have meant restating it in full, because
-        // the framework replaces the default directives rather than merging
-        // with them — so the app would stop inheriting future defaults, and one
-        // line of preview would have pinned the whole security posture. Reading
-        // the file costs a base64 string for something under 256 KB, once,
-        // thrown away on the next pick.
+        // A data URL, not `URL.createObjectURL`. An object URL is the better
+        // mechanism, but it produces a `blob:` URL and this app's
+        // Content-Security-Policy allows `'self'` and `data:` only — and
+        // widening it means restating every directive, since the framework
+        // replaces the defaults rather than merging with them.
         const reader = new FileReader();
         reader.addEventListener('load', () => {
           preview.src = String(reader.result);

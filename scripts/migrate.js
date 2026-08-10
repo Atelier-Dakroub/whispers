@@ -1,9 +1,9 @@
-// Applies migrations to whatever DB_DRIVER names.
+// Applies migrations to whatever DB_DRIVER names:
 //
 //   npm run db:migrate
 //
-// D1 is the exception: Cloudflare applies its own, over the API, reading the
-// same drizzle/sqlite directory that wrangler.jsonc names as migrations_dir.
+// D1 is the exception. Cloudflare applies its own over the API, reading the
+// same drizzle/sqlite directory wrangler.jsonc names as migrations_dir:
 //
 //   npx wrangler d1 migrations apply whispers --local
 //   npx wrangler d1 migrations apply whispers --remote

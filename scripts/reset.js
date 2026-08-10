@@ -1,18 +1,15 @@
-// Erases the database and applies the migrations again.
+// Erases the database and migrates it again:
 //
 //   npm run db:reset -- --yes
 //
-// Everything goes: headlines, settings, the logo and every account. The next
-// visitor gets /setup and claims the site.
+// Everything goes — headlines, settings, the logo, every account — and the next
+// visitor to /setup claims the site. To get back in without losing anything,
+// `npm run member:reset` gives one person a new passphrase instead.
 //
-// If you only need back in, you do not want this. `npm run member:reset` gives
-// one person a new passphrase and leaves the site alone.
-//
-// The migrate runs from inside this process rather than as `&& npm run
-// db:migrate` in the npm script. `npm run db:reset -- --yes` appends the flag
-// to the end of the whole script string, so with a chain it lands on the second
-// command: the reset reads no `--yes`, refuses, and the migrate that follows
-// succeeds — which looks precisely like a reset that worked.
+// The migrate runs inside this process rather than as `&& npm run db:migrate`
+// in the npm script, because npm appends `-- --yes` to the end of the whole
+// string: chained, the flag lands on the migrate, this refuses, and the migrate
+// succeeds — which looks exactly like a reset that worked.
 
 import process from 'node:process';
 import { applyMigrations, dropEverything } from './lib/db-admin.js';

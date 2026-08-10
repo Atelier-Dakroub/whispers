@@ -79,19 +79,14 @@
 <meta name="description" content="${tagline || title}" />
 <link rel="alternate" type="application/rss+xml" title="${title}" href="/feed.xml" />
 
-<!-- A directive on a tag hoisted into <head> is honored as of core 0.10.0.
-     Before that the `if` was dropped and both of these rendered on every page,
-     href and all, pointing at pages that did not exist. -->
+<!-- Directives work on tags that get hoisted into <head>, so these two appear
+     only on the pages that have somewhere to point. -->
 <link if="older" rel="next" href="${older}" />
 <link if="newer" rel="prev" href="${newer}" />
 
-<!-- A sentence and a link, not a sentence with a link inside it. A translator
-     cannot move an <a> that is buried in a string, and several languages need
-     to put it somewhere else. -->
 <!-- Above the day headings, because a breaking story is not "today", it is
-     "now". It leaves on its own once the window in the settings passes: the
-     column holds when it was marked, and the query compares that to a cutoff,
-     so nothing has to run to un-break it. -->
+     "now". It leaves on its own: the column holds when it was marked and the
+     query compares that to a cutoff, so nothing has to run to un-break it. -->
 <section class="breaking" if="urgent.length" aria-label="${s.breaking}">
   <p class="breaking-label">${s.breaking}</p>
   <ul class="headlines">
@@ -103,13 +98,15 @@
   </ul>
 </section>
 
+<!-- A sentence and a link, not a sentence with a link inside it: a translator
+     cannot move an <a> buried in a string. -->
 <p class="empty" if="!total && !urgent.length">
   ${s.empty} <a href="/login">${s.emptyInvite}</a>
 </p>
 
-<!-- Two shapes for one list, chosen by a setting. A day heading is a real
-     heading, so it is an <h2> and the list under it is its own <ul>: a screen
-     reader reads "Today, list of six items" rather than one list of forty. -->
+<!-- A day heading is a real heading, so it is an <h2> and the list under it is
+     its own <ul>: a screen reader announces "Today, list of six items" rather
+     than one list of forty. -->
 <div class="stack" else-if="headings">
   <section class="day" each="day of days" key="day.key">
     <h2 class="day-heading">

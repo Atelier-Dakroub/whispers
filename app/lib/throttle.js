@@ -1,16 +1,11 @@
-// A limit on sign-in attempts.
+// A limit on sign-in attempts, so guessing a passphrase is not free.
 //
-// A handful of people share this door and each holds one passphrase, so the
-// only way in from outside is to guess one. Without a limit, guessing is free
-// and unlimited. With one, it is neither.
-//
-// The counter is in memory, which means it is per-process, and on workerd
-// per-isolate. An attacker spread across enough isolates gets more attempts
-// than the numbers below suggest. That is a real weakness and the honest fix is
-// a shared counter, which would be a database write on every failed sign-in —
-// the wrong trade for a site with five accounts. What this does buy is the
-// thing that actually happens: a script hammering one address from one place
-// stops after eight tries.
+// The counter lives in memory, so it is per-process and on workerd
+// per-isolate: an attacker spread across enough isolates gets more attempts
+// than the numbers below suggest. A shared counter would mean a database write
+// on every failed sign-in, which is the wrong trade for a site with five
+// accounts. This still stops the thing that actually happens — one script
+// hammering one address.
 
 /** @type {Map<string, { failures: number, first: number, until: number }>} */
 const seen = new Map();
@@ -28,13 +23,12 @@ const LOCKOUT = 15 * 60 * 1000;
 const MAX_KEYS = 5000;
 
 /**
- * Who is asking, as well as this can be known.
+ * The key an attempt counts against.
  *
- * Behind Cloudflare, `cf-connecting-ip` is set by the edge and cannot be forged
- * by the client. `x-forwarded-for` can be, by anyone, unless a proxy you run
- * overwrites it — so it is a hint here and not an identity. The address is half
- * the key; the email is the other half, which keeps one attacker from locking
- * out an entire office by failing on purpose.
+ * `cf-connecting-ip` is set by Cloudflare's edge and cannot be forged;
+ * `x-forwarded-for` can be by anyone, so it is a hint rather than an identity.
+ * The email is the other half of the key, which stops one attacker locking out
+ * a whole office by failing on purpose.
  *
  * @param {Request|null} request
  * @param {string} email
@@ -51,6 +45,12 @@ export function keyFor(request, email) {
   return `${ip}|${String(email ?? '').trim().toLowerCase()}`;
 }
 
+/**
+ * Drops entries that are neither locked out nor inside their window.
+ *
+ * @param {number} now
+ * @returns {void}
+ */
 const sweep = (now) => {
   for (const [key, entry] of seen) {
     if (entry.until < now && entry.first + WINDOW < now) seen.delete(key);
@@ -58,11 +58,11 @@ const sweep = (now) => {
 };
 
 /**
- * Whether this key may try, and how long until it may.
+ * Whether this key may try again yet.
  *
- * @param {string} key
+ * @param {string} key from `keyFor`
  * @param {number} [now]
- * @returns {{ allowed: boolean, retryAfter: number }} seconds
+ * @returns {{ allowed: boolean, retryAfter: number }} `retryAfter` in seconds
  */
 export function check(key, now = Date.now()) {
   const entry = seen.get(key);
@@ -76,10 +76,11 @@ export function check(key, now = Date.now()) {
 }
 
 /**
- * Records a failed attempt, and closes the door once there have been enough.
+ * Records a failed attempt, and locks the key out once there have been enough.
  *
- * @param {string} key
+ * @param {string} key from `keyFor`
  * @param {number} [now]
+ * @returns {void}
  */
 export function fail(key, now = Date.now()) {
   if (seen.size > MAX_KEYS) sweep(now);
@@ -101,8 +102,17 @@ export function fail(key, now = Date.now()) {
   }
 }
 
-/** Forgets a key. Called on a sign-in that worked. */
+/**
+ * Forgets a key, after a sign-in that worked.
+ *
+ * @param {string} key from `keyFor`
+ * @returns {void}
+ */
 export const reset = (key) => void seen.delete(key);
 
-/** Only the tests use this. */
+/**
+ * Forgets every key. Only the tests use this.
+ *
+ * @returns {void}
+ */
 export const forget = () => seen.clear();

@@ -248,7 +248,7 @@ there is no database to read the setting from, so it takes its language from
 
 The upload is the preview box: the whole thing is a `<label>` and the file
 input lives inside it, so clicking anywhere opens the picker and the native
-control's grey "no file chosen" bar is gone.
+control's gray "no file chosen" bar is gone.
 
 The input is still a real `<input type="file">`, clipped to a pixel rather than
 `display: none`. That distinction is the whole accessibility of the pattern —

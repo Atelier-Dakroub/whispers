@@ -138,6 +138,33 @@ it('a cross-origin post is refused even with a real session', async () => {
   assert.equal(res.status, 403);
 });
 
+it('sign-in never redirects off this origin', async () => {
+  // `/\\evil.example` is the one that matters: it passes a `startsWith('//')`
+  // check and still lands on another host, because the URL parser reads a
+  // backslash as a slash. Pattern-matching a path cannot catch that, so the
+  // value is resolved and its origin compared instead.
+  const hostile = [
+    'https://evil.example/x',
+    '//evil.example/x',
+    '/\\evil.example',
+    '/\\\\evil.example',
+    'https:evil.example',
+    'http://localhost@evil.example',
+  ];
+
+  for (const next of hostile) {
+    const res = await post('/login', { ...FIRST, next });
+    const location = new URL(res.headers.get('location') ?? '', ORIGIN);
+
+    assert.equal(location.origin, ORIGIN, `next=${next} escaped to ${location.origin}`);
+    assert.equal(location.pathname, '/admin', `next=${next} should fall back`);
+  }
+
+  // And a real destination still works.
+  const good = await post('/login', { ...FIRST, next: '/admin/settings?x=1' });
+  assert.match(good.headers.get('location') ?? '', /\/admin\/settings\?x=1$/);
+});
+
 it('a wrong passphrase says the same thing as an unknown address', async () => {
   const known = 'ada@example.com';
   const unknown = 'nobody@example.com';
@@ -410,6 +437,37 @@ it('settings reach the page, and a bad one saves nothing', async () => {
     /<title>The Whispers<\/title>/,
     'the valid half of a refused form must not be written either',
   );
+});
+
+it('every color on the form saves, and Reset returns all of them', async () => {
+  // The field names are read off the form rather than listed here. A list in a
+  // test agrees with whatever the action happens to read, which is how the two
+  // breaking colors sat on the page for a week doing nothing: the swatches were
+  // rendered, and the action's own hand-written list had never heard of them.
+  const swatches = (html) =>
+    [...html.matchAll(/<input[^>]*?\bname="(\w+)"[^>]*?\btype="color"/g)].map((m) => m[1]);
+
+  const before = swatches(await get('/admin/settings', session).then((r) => r.text()));
+  assert.ok(before.length >= 8, `expected the color inputs, found ${before.length}`);
+
+  // A different value per swatch, so one field standing in for another shows up.
+  const picked = Object.fromEntries(
+    before.map((name, i) => [name, `#${(0x111111 * (i + 3)).toString(16).padStart(6, '0')}`]),
+  );
+
+  assert.equal((await post('/admin/settings', { intent: 'save', ...picked }, { cookie: session })).status, 303);
+
+  const saved = await get('/admin/settings', session).then((r) => r.text());
+  for (const [name, value] of Object.entries(picked)) {
+    assert.match(saved, new RegExp(`name="${name}"[^>]*?value="${value}"`, 's'), `${name} did not save`);
+  }
+
+  assert.equal((await post('/admin/settings', { intent: 'reset-colors' }, { cookie: session })).status, 303);
+
+  const back = await get('/admin/settings', session).then((r) => r.text());
+  for (const name of before) {
+    assert.doesNotMatch(back, new RegExp(`name="${name}"[^>]*?value="${picked[name]}"`, 's'), `${name} survived Reset`);
+  }
 });
 
 // ── people ─────────────────────────────────────────────────────────────────
@@ -822,6 +880,52 @@ it('the colors can be put back', async () => {
   assert.match(back, /--font-head: Charter|--font-head: Didot/);
 });
 
+it('resetting a passphrase ends the sessions opened with the old one', async () => {
+  // The reason `member:reset` exists is that a passphrase leaked. If the
+  // session cookie outlives the reset, it has done nothing about the person
+  // holding that cookie — so the cookie carries a fingerprint of the stored
+  // verifier and stops matching the moment it changes.
+  const added = await post(
+    '/admin/people',
+    { intent: 'add', name: 'Temporary Editor', email: 'temp@example.com' },
+    { cookie: session },
+  ).then((r) => r.text());
+
+  const first = added.match(/<code class="secret">([^<]+)<\/code>/)?.[1] ?? '';
+  assert.ok(first, 'a passphrase is shown once');
+
+  const theirs = cookieOf(await post('/login', { email: 'temp@example.com', passphrase: first }));
+  assert.equal((await get('/admin', theirs)).status, 200, 'they are in');
+
+  // Their row, not the first row: resetting the wrong person is how this test
+  // originally logged out the admin running it.
+  const rowOf = (page, email) =>
+    page
+      .split('<li')
+      .find((row) => row.includes(email))
+      ?.match(/name="id" value="([a-f0-9-]{36})"/)?.[1] ?? null;
+
+  const id = rowOf(await get('/admin/people', session).then((r) => r.text()), 'temp@example.com');
+  assert.ok(id, 'their row carries their id');
+
+  await post('/admin/people', { intent: 'reset', id }, { cookie: session });
+
+  assert.equal((await get('/admin', theirs)).status, 303, 'their old cookie is dead');
+  assert.equal(
+    (await post('/admin', { headline: 'x', url: 'https://e.test/x' }, { cookie: theirs })).status,
+    303,
+    'and dead for writes, not only for pages',
+  );
+  assert.equal((await get('/admin', session)).status, 200, 'the admin is untouched');
+
+  await post('/admin/people', { intent: 'remove', id }, { cookie: session });
+  assert.doesNotMatch(
+    await get('/admin/people', session).then((r) => r.text()),
+    /temp@example\.com/,
+    'and the fixture is cleaned up for the tests after this one',
+  );
+});
+
 // ── contrast ───────────────────────────────────────────────────────────────
 
 it('APCA agrees with the reference implementation', async () => {
@@ -845,7 +949,7 @@ it('the shipped palette passes, and a bad one is reported rather than refused', 
 
   assert.deepEqual(audit(DEFAULTS), [], 'the defaults clear every bar');
 
-  // Mid grey on white: a classic that looks fine to the person who picked it.
+  // Mid gray on white: a classic that looks fine to the person who picked it.
   const bad = audit({ ...DEFAULTS, inkLight: '#9a9a9a', linkLight: '#b0b0b0' });
   assert.ok(bad.length >= 2);
   assert.match(bad[0].what, /Headlines/);

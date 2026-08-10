@@ -113,13 +113,6 @@ export type ConfirmButtonProps = {
   value: string;
 };
 
-/** Properties of `<svg-icon>`, from its <script properties> block. */
-export type SvgIconProps = {
-  library: string;
-  name: string;
-  label: string;
-};
-
 /** The `ctx` argument of `root/_layout.html`'s loader. */
 export type RootLayoutContext = {
   url: string;
@@ -765,6 +758,5 @@ export type _404Data = {
 declare global {
   interface HTMLElementTagNameMap {
     "confirm-button": HTMLElement;
-    "svg-icon": HTMLElement;
   }
 }

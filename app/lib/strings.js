@@ -1,21 +1,14 @@
-// The words the reader sees that are not the news.
+// The words the reader sees that are not the news. Everything else on the page
+// is a headline somebody typed, a date `Intl` formats, or a color.
 //
-// There are eleven of them. Everything else on the page is a headline somebody
-// typed, a date `Intl` formats, or a color.
+// The admin is deliberately not here: it is a hundred and fifty strings seen by
+// the handful of people who chose to install an English product, where this is
+// the part their *audience* reads.
 //
-// The admin is deliberately not here. It is seen by one to five people who
-// chose to install an English product, it is a hundred and fifty strings, and a
-// half-finished translation of it would be worse than none. This file is the
-// part a buyer's *audience* reads.
-//
-// Two rules that keep it translatable:
-//
-//   No markup in a string. A sentence with a link buried in it cannot be
-//   reordered by a translator, and several languages need to. The empty state
-//   is a sentence plus a separate link, not one string with an <a> in it.
-//
-//   No concatenation. `Page {page} of {pages}` is one string with two holes,
-//   because "of" lands in a different place in almost every language.
+// Two rules keep it translatable. No markup inside a string, because a
+// translator cannot move an `<a>` buried in one. And no concatenation — `Page
+// {page} of {pages}` is one string with two holes, since "of" lands somewhere
+// different in almost every language.
 //
 // Missing keys fall back to English one at a time, so a partial translation is
 // useful rather than broken.
@@ -40,12 +33,9 @@ const EN = {
 };
 
 /**
- * Keyed by language subtag, not by full tag. `fr-CA` and `fr-FR` want the same
- * eleven words; a region only matters for dates and numbers, and `Intl`
- * already has the full tag for those.
- *
- * To add a language, add a key. To correct one, edit it. Nothing else in the
- * app has to know.
+ * Keyed by language subtag, not full tag: `fr-CA` and `fr-FR` want the same
+ * words, and `Intl` already has the full tag for dates and numbers. To add a
+ * language, add a key.
  */
 const TRANSLATIONS = {
   fr: {
@@ -134,10 +124,10 @@ const TRANSLATIONS = {
 export const TRANSLATED = ['en', ...Object.keys(TRANSLATIONS)];
 
 /**
- * The eleven words, in the closest language there is to the one asked for.
+ * The words, in the closest language there is to the one asked for.
  *
  * @param {string} locale a full tag, like `fr-CA`
- * @returns {Strings}
+ * @returns {Strings} English for anything untranslated, key by key
  */
 export function stringsFor(locale) {
   const language = String(locale ?? '')
@@ -148,17 +138,16 @@ export function stringsFor(locale) {
 }
 
 /**
- * Fills the holes in a string, with the numbers written the way the locale
- * writes numbers.
+ * Fills the holes in a string, writing numbers the way the locale writes them.
  *
- * `Intl.NumberFormat` rather than the number itself, because a locale's
- * numbering system is part of its language: `ar-EG` writes ٣ where `ar-LB`
- * writes 3, and neither is a translation decision anybody should have to make.
+ * Through `Intl.NumberFormat`, because a numbering system is part of a
+ * language: `ar-EG` writes ٣ where `ar-LB` writes 3, and that is not a decision
+ * a translator should have to make.
  *
- * @param {string} template
+ * @param {string} template with `{name}` holes
  * @param {Record<string, number|string>} values
  * @param {string} locale
- * @returns {string}
+ * @returns {string} unknown holes are left as they are
  */
 export function fill(template, values, locale) {
   const numbers = new Intl.NumberFormat(locale);

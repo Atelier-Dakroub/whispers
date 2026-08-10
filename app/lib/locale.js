@@ -1,12 +1,8 @@
-// What a language tag implies about the page.
+// Which way the page runs, from its language tag.
 //
-// The locale setting already decides how a date is spelled. It also decides two
-// attributes on <html> that nothing else can work out: which language the text
-// is in, and which way it runs.
-//
-// Both matter more than they look. A page that says `lang="en"` while showing
-// Arabic gets read aloud by a screen reader in the wrong voice, hyphenated by
-// the wrong rules, and offered to the wrong translation prompt.
+// A page that claims `lang="en"` while showing Arabic is read aloud in the
+// wrong voice and hyphenated by the wrong rules, so the locale setting decides
+// both attributes on <html> rather than only the date format.
 
 /** The direction a script runs, when `Intl` has nothing to say. */
 const RTL = new Set([
@@ -14,14 +10,13 @@ const RTL = new Set([
 ]);
 
 /**
- * `'rtl'` or `'ltr'` for a language tag.
+ * The direction a language runs in.
  *
- * `Intl.Locale` knows this, and knowing it from the tag beats a list somebody
- * has to remember to extend. The list is the fallback for a runtime whose ICU
- * was built without text info, where guessing `ltr` would silently mirror an
- * Arabic site the wrong way.
+ * Asks `Intl.Locale` first, since it knows more tags than any list here would.
+ * The list above is the fallback for a runtime built without text info, where
+ * defaulting to `ltr` would silently mirror an Arabic site the wrong way.
  *
- * @param {string} tag
+ * @param {string} tag a language tag, like `ar-LB`
  * @returns {'rtl'|'ltr'}
  */
 export function directionOf(tag) {

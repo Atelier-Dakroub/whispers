@@ -1,5 +1,5 @@
 <script server>
-  import { count, find } from '../../data/members.js';
+  import { bySession, count } from '../../data/members.js';
 
   // The guard, written once for everything below it.
   //
@@ -22,8 +22,7 @@
 
     if ((await count()) === 0) return Response.redirect(new URL('/setup', url), 303);
 
-    const id = await cookies.signed.get('session');
-    const member = id ? await find(id) : null;
+    const member = await bySession(await cookies.signed.get('session'));
 
     if (!member) {
       // A session for a member who has since been removed lands here too, which

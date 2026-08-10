@@ -19,7 +19,7 @@
 /* `hidden` is a UA rule, and any author rule that sets `display` beats it —
    which means an element with the attribute stays on screen. `.logo` setting
    `display: block` did exactly that: the empty preview was still a flex item,
-   and it pushed the "Nothing uploaded" text off centre.
+   and it pushed the "Nothing uploaded" text off center.
    
    `!important` because the whole point is to outrank whatever display the
    element was given. If something needs to be laid out while hidden, it should

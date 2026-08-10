@@ -1,29 +1,21 @@
 <!-- A destructive action, behind a confirmation, with no JavaScript.
 
-     `command` and `commandfor` are the platform's invoker. A button carrying
-     them opens the dialog it names, and the browser supplies everything a
-     confirmation needs and everything a hand-rolled modal gets wrong: the
-     backdrop, the focus trap, Escape to dismiss, the rest of the page made
-     inert, and focus returned to the button afterwards.
+     `command` and `commandfor` are the platform's invoker: the button opens the
+     dialog it names, and the browser supplies the backdrop, the focus trap,
+     Escape, the inert page and focus returned afterwards.
 
-     Writing a click handler for this is the common mistake. It ships script,
-     it needs a CSP hash, and it loses all of the above.
-
-     The dialog holds an ordinary <form method="post">, so confirming is a form
-     submission to the page it sits on. Nothing here knows what it deletes: the
-     caller passes the field to send, and any others as children.
+     The dialog holds an ordinary form, so confirming is a submission to the page
+     it sits on. Nothing here knows what it deletes — the caller names the field
+     to send and passes any others as children.
 
          <confirm-button
-           key="${item.id}"
+           token="${item.id}"
            heading="Delete this headline?"
            detail="${item.headline}"
            value="delete"
          >
            <input type="hidden" name="id" value="${item.id}" />
-         </confirm-button>
-
-     A cancel is `command="close"`, not `<form method="dialog">`. Both close it
-     without submitting; the invoker keeps the pattern to one idea. -->
+         </confirm-button> -->
 
 <script properties>
   export default {

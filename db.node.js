@@ -1,26 +1,30 @@
 // The database, for every runtime that is not workerd.
 //
-// This file is a preload, not an import. `npm run dev`, `npm start` and
-// `npm test` all run it through `node --import ./db.node.js`, which wires the
-// store before the transclude binary starts. See package.json.
+// A preload rather than an import: `npm run dev`, `npm start` and `npm test`
+// all run it through `node --import ./db.node.js`, which wires the store before
+// the transclude binary starts.
 //
-// It lives at the project root and nothing under `app/` references it. That is
-// deliberate and it is the whole trick: a `node:` import anywhere in the app
-// tree would be pulled into the worker bundle, where it does not exist. Keeping
-// the Node wiring outside the tree means wrangler never sees it, and no bundler
-// has to be told to ignore anything.
+// It sits at the project root and nothing under `app/` references it, which is
+// the whole trick — a `node:` import inside the app tree would be pulled into
+// the worker bundle, where it does not exist.
 //
-// The build does NOT preload this. A build with no database is the correct
-// state: every content page is `prerender = false`, and the only page written
-// to a file is `404.html`, which must render for a visitor who does not exist
-// yet. Every repository answers a null store with defaults so that works.
+// The build does not preload it. A build with no database is correct: the only
+// page written to a file is 404.html, and every repository answers a null store
+// with defaults so that works.
 
 import process from 'node:process';
 import { setDb } from './app/data/db.js';
 
 const driver = process.env.DB_DRIVER ?? 'libsql';
 
-/** Told to the user rather than thrown as a resolution error nobody can read. */
+/**
+ * Fails with a message naming the package, rather than a resolution error.
+ *
+ * @param {string} pkg
+ * @param {string} name the DB_DRIVER value that needs it
+ * @returns {never}
+ * @throws always
+ */
 const missing = (pkg, name) => {
   throw new Error(
     `[whispers] DB_DRIVER=${name} needs the ${pkg} package, which is not installed.\n` +
@@ -28,7 +32,12 @@ const missing = (pkg, name) => {
   );
 };
 
-/** @returns {Promise<{ db: any, tables: any, dialect: 'sqlite'|'pg' }>} */
+/**
+ * Builds the Drizzle instance DB_DRIVER names.
+ *
+ * @returns {Promise<{ db: any, tables: any, dialect: 'sqlite'|'pg' }>}
+ * @throws when the driver is unknown, or its package is not installed
+ */
 async function build() {
   if (driver === 'libsql' || driver === 'turso') {
     const url = process.env.DATABASE_URL ?? 'file:./data/whispers.db';
@@ -38,7 +47,7 @@ async function build() {
     const { drizzle } = await import('drizzle-orm/libsql');
     const tables = await import('./app/data/schema.sqlite.js');
 
-    // An auth token is how Turso and a self-hosted sqld differ from a file.
+    // An auth token is what separates Turso and a self-hosted sqld from a file.
     const client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN });
 
     return { db: drizzle(client), tables, dialect: 'sqlite' };
@@ -52,9 +61,9 @@ async function build() {
     const { drizzle } = await import('drizzle-orm/better-sqlite3');
     const tables = await import('./app/data/schema.sqlite.js');
 
+    // WAL gives concurrent readers alongside a writer, which a news page wants
+    // and the default rollback journal does not.
     const sqlite = new Database(path);
-    // Concurrent readers alongside a writer, which a news page wants and the
-    // default rollback journal does not give.
     sqlite.pragma('journal_mode = WAL');
 
     return { db: drizzle(sqlite), tables, dialect: 'sqlite' };

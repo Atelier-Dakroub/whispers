@@ -1,31 +1,26 @@
-// APCA — how readable one color is on another.
+// APCA — how readable one color is on another. Implements APCA-W3 0.1.9.
 //
-// WCAG 2's contrast ratio is a formula from the 1980s that does not model how
-// human vision actually works: it reports the same number for a pair whether
-// the text is dark on light or light on dark, and it passes combinations that
-// are genuinely hard to read while failing some that are fine. APCA models
-// polarity and perceptual lightness, which is why the numbers below differ
-// between a light theme and a dark one built from the same two colors.
+// Used instead of a WCAG 2 ratio because APCA accounts for polarity: the same
+// two colors score differently as a light theme and as a dark one, which is
+// exactly the distinction a theming feature has to get right.
 //
-// This app hands every color to the owner. That is the feature — and it means
-// the owner can pick a pair nobody can read. So the settings page measures what
-// they chose and says so.
-//
-// It says so rather than refusing. A contrast score is a strong signal, not a
-// law: a masthead in a brand color that lands slightly under the bar is the
-// owner's call, and an app that blocked it would be wrong about who decides.
-//
-// Implementation: APCA-W3 0.1.9, the version the WCAG 3 draft describes.
+// The settings page reports what falls short rather than refusing it. A brand
+// color that lands slightly under the bar is the owner's call to make.
 
-/** @param {string} hex `#rrggbb` or `#rgb` */
+/**
+ * Screen luminance for a hex color.
+ *
+ * @param {string} hex `#rrggbb` or `#rgb`
+ * @returns {number} 0 to 1
+ */
 function luminance(hex) {
   let h = String(hex).trim().replace('#', '');
   if (h.length === 3) h = [...h].map((c) => c + c).join('');
 
   const channel = (i) => (parseInt(h.slice(i, i + 2), 16) || 0) / 255;
 
-  // 2.4 straight, not the piecewise sRGB transfer function. APCA specifies the
-  // simple exponent, and using the piecewise one shifts the scores.
+  // A straight 2.4 exponent, not the piecewise sRGB curve. APCA specifies this
+  // one, and the piecewise version shifts every score by a few points.
   return (
     0.2126729 * channel(0) ** 2.4 +
     0.7151522 * channel(2) ** 2.4 +
@@ -33,18 +28,20 @@ function luminance(hex) {
   );
 }
 
-/** Very dark colors flare in a way the exponent alone does not predict. */
+/**
+ * Softens very dark values, which flare in a way the exponent alone misses.
+ *
+ * @param {number} y
+ * @returns {number}
+ */
 const clampBlack = (y) => (y < 0.022 ? y + (0.022 - y) ** 1.414 : y);
 
 /**
- * Lightness contrast, 0 to about 106.
+ * Lightness contrast between two colors.
  *
- * The sign says which way round it is; every caller here wants the size, so
- * this returns the absolute value.
- *
- * @param {string} text
- * @param {string} background
- * @returns {number} Lc, one decimal place
+ * @param {string} text hex
+ * @param {string} background hex
+ * @returns {number} Lc from 0 to about 106, unsigned, to one decimal
  */
 export function contrast(text, background) {
   const ytxt = clampBlack(luminance(text));
@@ -66,13 +63,7 @@ export function contrast(text, background) {
   return Math.round(Math.abs(out) * 1000) / 10;
 }
 
-/**
- * What each thing on the page needs.
- *
- * From APCA's font-size and weight table, rounded to the sizes this app
- * actually uses. Body text is the strictest because it is the text somebody
- * reads a hundred lines of.
- */
+/** The Lc each role needs, from APCA's size and weight table. */
 export const NEEDS = {
   /** Headlines, at 1.12rem. */
   headline: 75,
@@ -85,11 +76,10 @@ export const NEEDS = {
 };
 
 /**
- * Everything worth checking about a palette, as a list of complaints.
+ * Checks a palette and returns what falls short, empty if nothing does.
  *
- * Empty means every pair clears its bar. Each entry names the pair in the
- * owner's words — "Text on background", not "inkLight/bgLight" — because the
- * person reading it is choosing colors, not reading the schema.
+ * Complaints name the pair the way the owner sees it, not the way the schema
+ * does, because the person reading them is choosing colors.
  *
  * @param {import('../data/settings.js').Settings} settings
  * @returns {{ where: string, what: string, lc: number, need: number }[]}
