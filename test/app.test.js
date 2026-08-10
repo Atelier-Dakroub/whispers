@@ -1282,6 +1282,30 @@ it('signing in from /login lands on the admin, not back on /login', async () => 
   }
 });
 
+it('the built stylesheet keeps light-dark(), rather than a broken polyfill', () => {
+  // LightningCSS rewrites `light-dark()` for old targets into
+  //   var(--lightningcss-light, A) var(--lightningcss-dark, B)
+  // and did not emit the switch variables that choose between A and B, so both
+  // landed in the value at once. An invalid var() inside a shorthand voids the
+  // declaration, which turned `border: 1px solid var(--rule)` into no border at
+  // all — every rule, every input outline, and the whole palette, gone.
+  //
+  // vite.config.js pins a target new enough to leave the function alone. This
+  // reads the built file because the bug lives in the build, not the source.
+  const dir = path.join(root, 'dist', 'client', 'assets');
+  const sheet = fs.readdirSync(dir).find((f) => f.endsWith('.css'));
+  assert.ok(sheet, 'expected a built stylesheet');
+
+  const css = fs.readFileSync(path.join(dir, sheet), 'utf8');
+
+  assert.doesNotMatch(
+    css,
+    /--lightningcss-/,
+    'light-dark() was polyfilled; check build.cssTarget in vite.config.js',
+  );
+  assert.match(css, /light-dark\(/, 'the stylesheet should still use light-dark()');
+});
+
 it('passphrases are hashed at a cost workerd will actually run', async () => {
   // workerd refuses PBKDF2 above 100,000 iterations outright — a
   // NotSupportedError, not a slow response — on every Cloudflare plan. These
