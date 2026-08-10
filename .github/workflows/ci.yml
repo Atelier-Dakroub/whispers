@@ -3,9 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
+    # So a release tag is verified as its own thing, rather than assumed from
+    # whatever the branch was doing.
+    tags: ['v*']
   pull_request:
-  # So a release tag is verified as its own thing, not assumed from the branch.
-  tags: ['v*']
 
 jobs:
   verify:
