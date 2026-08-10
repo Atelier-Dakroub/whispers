@@ -1,0 +1,40 @@
+{
+  // The public demo at demo.whispers.news, and a worked example of the config
+  // wrangler.jsonc only describes. Everything here is real: this is what a
+  // finished deploy looks like once the placeholders are filled in.
+  //
+  //   npm run deploy:demo
+  //
+  // A database id is not a secret — reaching it still needs account
+  // credentials — so this file is committed. COOKIE_SECRET is not here, and
+  // must not be: see the note at the bottom.
+  "name": "whispers-demo",
+  "main": "worker.js",
+  "compatibility_date": "2026-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "rules": [{ "type": "Text", "globs": ["**/routes.json"], "fallthrough": true }],
+
+  "observability": { "enabled": true },
+
+  "d1_databases": [
+    {
+      // `worker.js` reads `env.DB`, so the binding name is not free.
+      "binding": "DB",
+      "database_name": "whispers-demo",
+      "database_id": "88c69ff2-6e21-429b-ad37-54d8125ecbab",
+      "migrations_dir": "drizzle/sqlite"
+    }
+  ],
+
+  "routes": [{ "pattern": "demo.whispers.news", "custom_domain": true }],
+
+  // Declaring a route turns the workers.dev address off by default. Left off
+  // here on purpose: a demo wants one address, not two, and a second one would
+  // be a copy of this site nobody is looking after.
+  "workers_dev": false
+
+  // The signing key for session cookies, set out of band because this file is
+  // committed:
+  //   npx wrangler secret put COOKIE_SECRET -c wrangler.demo.jsonc
+}

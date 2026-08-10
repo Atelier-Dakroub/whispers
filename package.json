@@ -20,7 +20,9 @@
     "member:add": "node --env-file-if-exists=.env scripts/member.js add",
     "member:reset": "node --env-file-if-exists=.env scripts/member.js reset",
     "start:worker": "wrangler dev",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:demo": "npm run build && wrangler deploy -c wrangler.demo.jsonc",
+    "db:migrate:demo": "wrangler d1 migrations apply whispers-demo --remote -c wrangler.demo.jsonc"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
