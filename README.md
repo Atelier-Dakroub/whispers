@@ -207,6 +207,46 @@ removes the mark.
 The reason for the limit is not tidiness. Readers will not trust your next
 `BREAKING` label if the last one is three days old.
 
+## The sponsor line
+
+The license charges for a site that shows ads, so the app carries a place to put
+one. It holds text and a link. It does not hold a script.
+
+The slot sits below the masthead and above the headlines. It is never inside the
+list. A reader takes in the full list in one movement, and an interruption
+inside it removes the thing this product is for.
+
+Three parts, all in Settings:
+
+- **Disclosure.** The words above the line, `Sponsored` by default. In the
+  United States the FTC requires a paid placement to say so, and other markets
+  have their own rule. It is a setting because the right word differs by market
+  and by language. It renders whenever the slot renders.
+- **Text and link.** The link is optional. Without one, the line is text.
+- **Artwork.** Optional, uploaded like the logo, and it replaces the text. The
+  text becomes the `alt` value.
+
+A paid link gets `rel="sponsored nofollow noopener"`. Google requires
+`sponsored` on a link that somebody paid for, and a site without it can receive
+a manual action.
+
+The link keeps its query. A headline link goes through `canonical()`, which
+strips the tracking parameters. That is right for a headline and wrong here: the
+`utm_` tags on a sponsor's link are how they measure what they bought.
+
+**An ad network needs JavaScript from another domain, and this app has no place
+for one.** The policy is `script-src 'self'` and `img-src 'self' data:`, so a
+network script and its images are blocked. To run one, an owner must:
+
+1. Restate the full Content-Security-Policy. `csp: true` replaces the
+   directives; it does not merge them. The site then stops to inherit later
+   defaults.
+2. Give up the "no JavaScript on the reader's page" claim.
+3. Accept a third party that watches the readers.
+
+Direct sponsorship costs none of those three, and it is what a trade wire or a
+niche newsletter usually sells.
+
 ## The footer credit
 
 The footer shows `Powered by Whispers` by default, and a setting removes it.

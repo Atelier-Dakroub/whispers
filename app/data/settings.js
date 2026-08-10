@@ -32,6 +32,10 @@ import { store } from './db.js';
  * @property {number} breakingHours 0 keeps a story breaking until it is unmarked
  * @property {boolean} credit
  * @property {boolean} newTab headlines open in a new tab
+ * @property {boolean} sponsor show the sponsor slot
+ * @property {string} sponsorText the line the sponsor bought
+ * @property {string} sponsorUrl where it points, optional
+ * @property {string} sponsorLabel the disclosure above it
  * @property {number} perPage
  * @property {number} passphraseRounds
  */
@@ -72,6 +76,14 @@ export const DEFAULTS = {
   // Off. A new tab is the reader's to ask for — they can already, with a
   // modifier key, and there is no gesture for the opposite.
   newTab: false,
+  sponsor: false,
+  sponsorText: '',
+  sponsorUrl: '',
+  // A disclosure, not a decoration. In the United States the FTC requires a
+  // paid placement to say so, and other markets have their own rule. It is a
+  // setting because the right word differs by market and by language, and it
+  // ships filled in because a buyer will not add one that starts empty.
+  sponsorLabel: 'Sponsored',
   perPage: 60,
   // See app/data/passphrase.js: workerd refuses PBKDF2 above this.
   passphraseRounds: 100_000,
@@ -96,7 +108,15 @@ const DENSITIES = ['compact', 'normal', 'relaxed'];
  * the boxes off the submission with it, and two copies of this list is how one
  * flag came to be validated here and never sent from there.
  */
-export const FLAGS = ['dayHeadings', 'showSource', 'showTime', 'rules', 'credit', 'newTab'];
+export const FLAGS = [
+  'dayHeadings',
+  'showSource',
+  'showTime',
+  'rules',
+  'credit',
+  'newTab',
+  'sponsor',
+];
 
 /**
  * Every setting the settings form carries as a text, number or select input —
@@ -202,6 +222,31 @@ export async function save(patch) {
 
   if ('title' in patch) text('title', patch.title, { max: 80, required: true });
   if ('tagline' in patch) text('tagline', patch.tagline, { max: 160 });
+  if ('sponsorText' in patch) text('sponsorText', patch.sponsorText, { max: 120 });
+  if ('sponsorLabel' in patch) text('sponsorLabel', patch.sponsorLabel, { max: 24 });
+
+  if ('sponsorUrl' in patch) {
+    const value = String(patch.sponsorUrl ?? '').trim();
+    let url = null;
+
+    if (value) {
+      try {
+        url = new URL(value);
+      } catch {
+        url = null;
+      }
+    }
+
+    // Deliberately not `canonical()` from link-check.js. That function strips
+    // tracking parameters, which is right for a headline and wrong here: a
+    // sponsor's `utm_` tags are how they measure the placement they paid for.
+    if (!value) writes.sponsorUrl = '';
+    else if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+      errors.sponsorUrl = 'Use a full http or https link.';
+    } else if (value.length > 2048) {
+      errors.sponsorUrl = 'That link is too long.';
+    } else writes.sponsorUrl = value;
+  }
 
   if ('timezone' in patch) {
     const zone = String(patch.timezone ?? '').trim();

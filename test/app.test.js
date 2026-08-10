@@ -691,7 +691,9 @@ it('the logo box is a label around a real file input, not a div', async () => {
   const page = await get('/admin/settings', session).then((r) => r.text());
 
   const labels = page.match(/<label class="logo-drop"[\s\S]*?<\/label>/g) ?? [];
-  assert.equal(labels.length, 2, 'one box per artwork');
+  // Two logos and the sponsor artwork. Every upload on this page uses the same
+  // box, so each one is checked for all of it below.
+  assert.equal(labels.length, 3, 'one box per artwork');
 
   for (const box of labels) {
     // A real input, still posting to the settings form. The whole point of
@@ -725,7 +727,7 @@ it('the logo box is a label around a real file input, not a div', async () => {
 
   // The filename readout is a live region, and it sits outside the label so it
   // is not swallowed into the control's accessible name.
-  assert.equal((page.match(/aria-live="polite"/g) ?? []).length, 2);
+  assert.equal((page.match(/aria-live="polite"/g) ?? []).length, labels.length);
   for (const box of labels) assert.doesNotMatch(box, /aria-live/);
 });
 
@@ -1358,6 +1360,105 @@ it('opening headlines in a new tab is a setting, and it reaches the markup', asy
   );
 
   await post('/admin/settings', base, { cookie: session });
+});
+
+it('the sponsor line renders only when it is on, and marks the paid link', async () => {
+  const base = {
+    intent: 'save',
+    title: 'The Whispers',
+    timezone: 'UTC',
+    locale: 'en-US',
+    themeMode: 'auto',
+    dayHeadings: '1',
+  };
+
+  // Off: nothing at all, not an empty container.
+  await post('/admin/settings', base, { cookie: session });
+  const off = await get('/').then((r) => r.text());
+  assert.doesNotMatch(off, /class="sponsor"/, 'no slot when the setting is off');
+
+  await post(
+    '/admin/settings',
+    {
+      ...base,
+      sponsor: '1',
+      sponsorLabel: 'Sponsored',
+      sponsorText: 'Ferry timetables, printed daily.',
+      sponsorUrl: 'https://example.test/ferries?utm_source=whispers',
+    },
+    { cookie: session },
+  );
+
+  const on = await get('/').then((r) => r.text());
+  assert.match(on, /class="sponsor"/);
+  assert.match(on, /Ferry timetables, printed daily\./);
+
+  // The disclosure is not optional, so it renders whenever the slot does.
+  assert.match(on, /class="sponsor-label">Sponsored</);
+
+  // What Google requires on a link somebody paid for. Its absence can cost the
+  // whole site its ranking, so this is not a nicety.
+  const link = /<a[^>]*class="sponsor-body"[^>]*>/.exec(on)?.[0] ?? '';
+  assert.match(link, /rel="sponsored nofollow noopener"/, link);
+
+  // The tracking parameters survive. `canonical()` would strip them, and they
+  // are how the sponsor measures the placement they bought.
+  assert.match(link, /utm_source=whispers/, link);
+
+  // Above the headlines, never inside the list.
+  assert.ok(
+    on.indexOf('class="sponsor"') < on.indexOf('id="headlines"'),
+    'the slot belongs above the headlines',
+  );
+
+  // A line with no link is not a link.
+  await post(
+    '/admin/settings',
+    { ...base, sponsor: '1', sponsorLabel: 'Sponsored', sponsorText: 'A friend of the wire.', sponsorUrl: '' },
+    { cookie: session },
+  );
+  const plain = await get('/').then((r) => r.text());
+  assert.match(plain, /A friend of the wire\./);
+  assert.doesNotMatch(
+    /<a[^>]*class="sponsor-body"[^>]*>/.exec(plain)?.[0] ?? '',
+    /href=/,
+    'no href, so it is not a link',
+  );
+
+  // A link that is not http(s) is refused, and nothing else on the form saves.
+  const bad = await post(
+    '/admin/settings',
+    { ...base, sponsor: '1', sponsorUrl: 'javascript:alert(1)' },
+    { cookie: session },
+  ).then((r) => r.text());
+  assert.match(bad, /Nothing was saved/);
+
+  await post('/admin/settings', { ...base, sponsor: '0' }, { cookie: session });
+});
+
+it('no page repeats an id', async () => {
+  // A duplicate id is silent. `for="x"` binds to whichever element comes first,
+  // and if that one is not a form control the label labels nothing — the
+  // checkbox stops responding to its own words and the page looks fine.
+  // A section heading and a checkbox both took `id="sponsor"` this way.
+  const pages = [
+    ['/admin/settings', session],
+    ['/admin', session],
+    ['/admin/people', session],
+    ['/', undefined],
+    ['/login', undefined],
+  ];
+
+  for (const [path, cookie] of pages) {
+    const html = await get(path, cookie).then((r) => r.text());
+
+    // Anchored on the attribute start, or `aria-invalid="false"` matches too.
+    const ids = [...html.matchAll(/[\s"]id="([^"]+)"/g)].map((m) => m[1]);
+    const seen = new Set();
+    const twice = ids.filter((id) => (seen.has(id) ? true : (seen.add(id), false)));
+
+    assert.deepEqual([...new Set(twice)], [], `${path} repeats an id`);
+  }
 });
 
 it('passphrases are hashed at a cost workerd will actually run', async () => {

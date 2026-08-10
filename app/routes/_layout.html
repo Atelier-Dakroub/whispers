@@ -1,5 +1,5 @@
 <script server>
-  import { LOGO_DARK, stamp } from '../data/assets.js';
+  import { LOGO_DARK, SPONSOR, stamp } from '../data/assets.js';
   import { DENSITY, all as readSettings, colorScheme } from '../data/settings.js';
   import { DEFAULT_HEADLINE, DEFAULT_INTERFACE, stackOf } from '../lib/fonts.js';
   import { directionOf } from '../lib/locale.js';
@@ -34,6 +34,20 @@
       // replaced logo needs a different URL or nobody sees it.
       logo: await stamp(),
       logoDark: await stamp(LOGO_DARK),
+      // The sponsor slot. Everything it needs is resolved here, so the template
+      // states the markup and decides nothing.
+      sponsorOn: site.sponsor && Boolean(site.sponsorText || (await stamp(SPONSOR))),
+      sponsorText: site.sponsorText,
+      sponsorLabel: site.sponsorLabel,
+      sponsorImage: await stamp(SPONSOR),
+      // `false` drops the attribute. An <a> with no href is not a link, which
+      // is what a sponsor line without a URL should be.
+      sponsorHref: site.sponsorUrl || false,
+      // `sponsored` is what Google requires on a link somebody paid for, and a
+      // site without it can take a manual action. `nofollow` is the older
+      // spelling of the same thing, kept for engines that only read that one.
+      sponsorRel: site.sponsorUrl ? 'sponsored nofollow noopener' : false,
+      sponsorTarget: site.sponsorUrl && site.newTab ? '_blank' : false,
     };
   };
 </script>
@@ -77,6 +91,25 @@
 
   <p class="tagline" if="site.tagline">${site.tagline}</p>
 </header>
+
+<!-- Below the masthead and above the headlines, never inside the list. A
+     reader takes in the whole list in one movement, and an interruption inside
+     it removes the thing this product sells.
+
+     The label is a disclosure. It is not decoration and it is not optional in
+     several markets, so it renders whenever the slot does. -->
+<aside class="sponsor" if="sponsorOn" aria-label="${sponsorLabel}">
+  <span class="sponsor-label">${sponsorLabel}</span>
+  <a class="sponsor-body" href="${sponsorHref}" rel="${sponsorRel}" target="${sponsorTarget}">
+    <img
+      if="sponsorImage"
+      class="sponsor-image"
+      src="/sponsor?v=${sponsorImage}"
+      alt="${sponsorText}"
+    />
+    <span else>${sponsorText}</span>
+  </a>
+</aside>
 
 <main id="headlines"><slot></slot></main>
 

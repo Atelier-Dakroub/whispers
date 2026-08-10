@@ -129,6 +129,45 @@ a {
   border: 0;
 }
 
+/* ── sponsor ──────────────────────────────────────────────────────────── */
+
+.sponsor {
+  max-width: var(--measure);
+  margin: 0 auto 1.5rem;
+  padding: 0.75rem 0;
+  border-block: 1px solid var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+/* Small, but not crushed. This is the label a reader needs to understand what
+   the line is, so it keeps the muted color rather than a lighter one. */
+.sponsor-label {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex: none;
+}
+
+.sponsor-body {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.sponsor-image {
+  display: block;
+  max-width: 100%;
+  /* A bought placement does not get to set its own height. */
+  max-height: 3rem;
+  width: auto;
+  height: auto;
+}
+
 /* ── masthead ─────────────────────────────────────────────────────────── */
 
 .masthead {

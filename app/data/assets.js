@@ -21,6 +21,9 @@ export const LOGO = 'logo';
  */
 export const LOGO_DARK = 'logo-dark';
 
+/** The optional artwork for the sponsor slot. Same table, another row. */
+export const SPONSOR = 'sponsor';
+
 /** What an owner may upload. SVG and PNG cover a wordmark and a bitmap logo. */
 export const ACCEPTED = ['image/svg+xml', 'image/png'];
 

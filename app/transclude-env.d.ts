@@ -51,6 +51,10 @@ type Settings = {
   breakingHours: number;
   credit: boolean;
   newTab: boolean;
+  sponsor: boolean;
+  sponsorText: string;
+  sponsorUrl: string;
+  sponsorLabel: string;
   perPage: number;
   passphraseRounds: number;
 };
@@ -161,6 +165,13 @@ export type RootLayoutData = {
   ui: string;
   logo: string | null;
   logoDark: string | null;
+  sponsorOn: boolean;
+  sponsorText: string;
+  sponsorLabel: string;
+  sponsorImage: string | null;
+  sponsorHref: string | boolean;
+  sponsorRel: string | boolean;
+  sponsorTarget: string | boolean;
 };
 
 /** The `ctx` argument of `admin/_layout.html`'s loader. */
@@ -193,6 +204,13 @@ export type AdminLayoutContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   };
   request: Request | null;
   fragment: string | null;
@@ -244,6 +262,13 @@ export type AdminPeopleContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   }, keyof {
     member: Member;
     path: string;
@@ -309,6 +334,13 @@ export type AdminSettingsContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   }, keyof {
     member: Member;
     path: string;
@@ -337,8 +369,10 @@ export type AdminSettingsData = {
   stacks: Stack[];
   hasLogo: boolean;
   hasLogoDark: boolean;
+  hasSponsor: boolean;
   logoSrc: string | boolean;
   logoDarkSrc: string | boolean;
+  sponsorSrc: string | boolean;
   contrast: {
     where: string;
     what: string;
@@ -384,6 +418,13 @@ export type AdminIndexContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   }, keyof {
     member: Member;
     path: string;
@@ -471,6 +512,13 @@ export type LoginContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   };
   request: Request | null;
   fragment: string | null;
@@ -523,6 +571,13 @@ export type SetupContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   };
   request: Request | null;
   fragment: string | null;
@@ -575,6 +630,13 @@ export type IndexContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   };
   request: Request | null;
   fragment: string | null;
@@ -671,6 +733,13 @@ export type AdminArticlesIdContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   }, keyof {
     member: Member;
     path: string;
@@ -739,6 +808,13 @@ export type _404Context = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    sponsorOn: boolean;
+    sponsorText: string;
+    sponsorLabel: string;
+    sponsorImage: string | null;
+    sponsorHref: string | boolean;
+    sponsorRel: string | boolean;
+    sponsorTarget: string | boolean;
   };
   request: Request | null;
   fragment: string | null;

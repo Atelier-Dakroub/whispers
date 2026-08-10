@@ -3,6 +3,7 @@
     ACCEPTED,
     LOGO,
     LOGO_DARK,
+    SPONSOR,
     exists,
     MAX_BYTES,
     stamp,
@@ -36,6 +37,7 @@
 
     const hasLogo = await exists(LOGO);
     const hasLogoDark = await exists(LOGO_DARK);
+    const hasSponsor = await exists(SPONSOR);
 
     // The version query the masthead uses. Without it a replaced logo keeps
     // showing the old one right where you went to check that it changed — these
@@ -47,6 +49,7 @@
     // somebody picks a file.
     const logoSrc = hasLogo ? `/logo?v=${await stamp(LOGO)}` : false;
     const logoDarkSrc = hasLogoDark ? `/logo?dark&v=${await stamp(LOGO_DARK)}` : false;
+    const sponsorSrc = hasSponsor ? `/sponsor?v=${await stamp(SPONSOR)}` : false;
 
     return {
       site,
@@ -54,8 +57,10 @@
       stacks: STACKS,
       hasLogo,
       hasLogoDark,
+      hasSponsor,
       logoSrc,
       logoDarkSrc,
+      sponsorSrc,
       // Measured, not guessed. Every color here is the owner's to choose, which
       // is the feature — and it means a pair nobody can read is one click away.
       // This says so; it does not refuse. A masthead color that lands just
@@ -107,6 +112,15 @@
       );
     }
 
+    if (intent === "remove-sponsor") {
+      await removeLogo(SPONSOR);
+      revalidateTag("articles");
+      return Response.redirect(
+        new URL("/admin/settings?removed=1#sponsor-slot", ctx.url),
+        303,
+      );
+    }
+
     if (intent === "remove-logo" || intent === "remove-logo-dark") {
       await removeLogo(intent === "remove-logo-dark" ? LOGO_DARK : LOGO);
       revalidateTag("articles");
@@ -150,6 +164,7 @@
     for (const [field, name] of [
       ["logo", LOGO],
       ["logoDark", LOGO_DARK],
+      ["sponsorImage", SPONSOR],
     ]) {
       const upload = form.get(field);
 
@@ -652,6 +667,120 @@
     </div>
 
   </form>
+
+  <h2 id="sponsor-slot">Sponsor</h2>
+
+  <p class="lede">
+    One line, above the headlines and outside the list. It takes text and a
+    link, never a script — an ad network needs JavaScript from another domain,
+    and this site's policy allows neither. See the README.
+  </p>
+
+  <label class="checkbox" for="sponsor">
+    <input type="hidden" name="sponsor" value="0" form="settings" />
+    <input
+      id="sponsor"
+      name="sponsor"
+      type="checkbox"
+      value="1"
+      form="settings"
+      checked="${site.sponsor}"
+    />
+    <span>Show the sponsor line</span>
+  </label>
+
+  <div class="row">
+    <label class="field" for="sponsorLabel">
+      <span>Disclosure</span>
+      <input
+        id="sponsorLabel"
+        name="sponsorLabel"
+        type="text"
+        form="settings"
+        value="${site.sponsorLabel}"
+        maxlength="24"
+        aria-invalid="${errors.sponsorLabel ? 'true' : 'false'}"
+      />
+      <span class="hint">Shown above the line. Required in some markets, so it is not optional here.</span>
+      <strong class="error" if="errors.sponsorLabel">${errors.sponsorLabel}</strong>
+    </label>
+
+    <label class="field" for="sponsorUrl">
+      <span>Link</span>
+      <input
+        id="sponsorUrl"
+        name="sponsorUrl"
+        type="url"
+        form="settings"
+        value="${site.sponsorUrl}"
+        placeholder="https://"
+        aria-invalid="${errors.sponsorUrl ? 'true' : 'false'}"
+      />
+      <span class="hint">Optional. Tracking parameters are kept, unlike a headline link.</span>
+      <strong class="error" if="errors.sponsorUrl">${errors.sponsorUrl}</strong>
+    </label>
+  </div>
+
+  <label class="field" for="sponsorText">
+    <span>Text</span>
+    <input
+      id="sponsorText"
+      name="sponsorText"
+      type="text"
+      form="settings"
+      value="${site.sponsorText}"
+      maxlength="120"
+      aria-invalid="${errors.sponsorText ? 'true' : 'false'}"
+    />
+    <span class="hint">Also the alt text when you upload artwork.</span>
+    <strong class="error" if="errors.sponsorText">${errors.sponsorText}</strong>
+  </label>
+
+  <div class="logo-slot">
+    <label class="logo-drop" data-slot="sponsorImage">
+      <span class="swatch-title" id="sponsorImage-title">Artwork</span>
+
+      <span class="logo-ground light">
+        <img
+          id="sponsorImage-preview"
+          src="${sponsorSrc}"
+          alt=""
+          class="logo"
+          hidden="${!hasSponsor}"
+        />
+        <span class="none" id="sponsorImage-empty" hidden="${hasSponsor}">Text only</span>
+      </span>
+
+      <span class="logo-cta" id="sponsorImage-cta">Choose a file, or drop one here</span>
+      <span class="hint" id="sponsorImage-hint">Optional. It replaces the text. SVG or PNG, up to ${maxKb} KB.</span>
+
+      <input
+        id="sponsorImageFile"
+        class="file-input"
+        form="settings"
+        name="sponsorImage"
+        type="file"
+        accept="${accepts}"
+        aria-labelledby="sponsorImage-title sponsorImage-cta"
+        aria-describedby="sponsorImage-hint sponsorImage-chosen"
+        aria-invalid="${errors.sponsorImage ? 'true' : 'false'}"
+      />
+    </label>
+
+    <span class="chosen" id="sponsorImage-chosen" aria-live="polite"></span>
+
+    <strong class="error" if="errors.sponsorImage">${errors.sponsorImage}</strong>
+    <confirm-button
+      if="hasSponsor"
+      token="sponsor"
+      label="Remove"
+      heading="Remove the sponsor artwork?"
+      note="The sponsor text is shown instead. The line itself stays until you turn it off."
+      confirm="Remove it"
+      cancel="Keep it"
+      value="remove-sponsor"
+    ></confirm-button>
+  </div>
 
   <!-- Outside the settings form, with the file inputs reaching back in through
        `form="settings"`. A Remove is a `confirm-button`, which carries its own
