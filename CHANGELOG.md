@@ -14,6 +14,26 @@ of view of somebody running the site rather than reading the code:
   add.
 - **Patch** — fixes and wording, no migration.
 
+## Unreleased
+
+### Added
+
+- A sponsor line, for the commercial buyers the license already charges. It
+  takes text, a link, and optional artwork, and never a script. A paid link
+  gets `rel="sponsored nofollow noopener"`.
+- A setting for opening headlines in a new tab. Off by default.
+
+### Fixed
+
+- **The reader's page hung on Cloudflare, permanently, about a minute after the
+  first visitor.** `revalidate` is now commented out in
+  `app/routes/index.html`. The framework rebuilds a stale page behind the
+  response without `waitUntil`; workerd cancels that work, the promise never
+  settles, and its `inFlight` entry is never cleared, so every later request
+  waits on a dead promise. Node, Deno and Bun are not affected.
+- A section heading and a checkbox both used `id="sponsor"`, so the label
+  labelled nothing and clicking it did nothing.
+
 ## 1.0.0
 
 The first release.

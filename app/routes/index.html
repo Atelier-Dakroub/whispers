@@ -14,7 +14,29 @@
   // the store for a minute, then refreshed behind whoever asks next. Every
   // admin write calls `ctx.revalidateTag('articles')`, so an edit shows up at
   // once rather than a minute later.
-  export const revalidate = { seconds: 60, tags: ['articles'] };
+  // Caching is off, and this is not a preference.
+  //
+  // The framework rebuilds a stale page behind the response and does not tie
+  // that work to the request:
+  //
+  //   refresh(key, window, render).catch(() => {});
+  //   return hit.html;
+  //
+  // workerd cancels asynchronous work that no `waitUntil` holds, so on
+  // Cloudflare the promise never settles. Its `.finally` never clears the key
+  // from the cache's `inFlight` map, and every later request for this page
+  // awaits a promise that is already dead. The page hangs, permanently, about a
+  // minute after the first visitor arrives. Measured on the demo: nothing for
+  // the first 40 seconds, then 2 to 5 of every 6 requests from t+69s.
+  //
+  // Node, Deno and Bun do not cancel the work, so this is a Cloudflare-only
+  // fault — and Cloudflare is the deployment this README recommends first.
+  //
+  // The fix belongs in @transclude/core, whose `src/after.js` already wraps
+  // `waitUntil`; `src/cache.js` needs to use it. 0.10.1 ships the same file.
+  // Until then the page renders per request, which costs a few D1 reads.
+  //
+  // export const revalidate = { seconds: 60, tags: ['articles'] };
 
   export default async ({ layout, url }) => {
     const { site } = layout;
