@@ -64,6 +64,10 @@
       tagline: site.tagline,
       headings: site.dayHeadings,
       showSource: site.showSource,
+      newTab: site.newTab,
+      // `false` rather than '', so the attribute is dropped rather than
+      // rendered as `target=""` — which is not the same thing.
+      linkTarget: site.newTab ? '_blank' : false,
       days: byDay(stamped, site),
       items: stamped,
       page,
@@ -84,6 +88,12 @@
 <link if="older" rel="next" href="${older}" />
 <link if="newer" rel="prev" href="${newer}" />
 
+<!-- Said once, because every headline behaves the same way. Sixty links each
+     announcing "opens in a new tab" is a lot to listen through; one line before
+     the list carries the same information. Off-screen, because the only reader
+     it helps is the one who cannot see it happen. -->
+<p class="offscreen" if="newTab">${s.newTab}</p>
+
 <!-- Above the day headings, because a breaking story is not "today", it is
      "now". It leaves on its own: the column holds when it was marked and the
      query compares that to a cutoff, so nothing has to run to un-break it. -->
@@ -91,7 +101,7 @@
   <p class="breaking-label">${s.breaking}</p>
   <ul class="headlines">
     <li each="item of urgent" key="item.id">
-      <a href="${item.url}" rel="noopener">${item.headline}</a>
+      <a href="${item.url}" rel="noopener" target="${linkTarget}">${item.headline}</a>
       <span class="source" if="showSource && item.source">${item.source}</span>
       <time class="at" if="item.time" datetime="${item.publishedAt}">${item.time}</time>
     </li>
@@ -115,7 +125,7 @@
 
     <ul class="headlines">
       <li each="item of day.items" key="item.id">
-        <a href="${item.url}" rel="noopener">${item.headline}</a>
+        <a href="${item.url}" rel="noopener" target="${linkTarget}">${item.headline}</a>
         <span class="source" if="showSource && item.source">${item.source}</span>
         <time class="at" if="item.time" datetime="${item.publishedAt}">${item.time}</time>
       </li>
@@ -125,7 +135,7 @@
 
 <ul class="headlines flat" else>
   <li each="item of items" key="item.id">
-    <a href="${item.url}" rel="noopener">${item.headline}</a>
+    <a href="${item.url}" rel="noopener" target="${linkTarget}">${item.headline}</a>
     <span class="source" if="showSource && item.source">${item.source}</span>
     <time class="at" if="item.time" datetime="${item.publishedAt}">${item.time}</time>
   </li>

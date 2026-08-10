@@ -1306,6 +1306,60 @@ it('the built stylesheet keeps light-dark(), rather than a broken polyfill', () 
   assert.match(css, /light-dark\(/, 'the stylesheet should still use light-dark()');
 });
 
+it('opening headlines in a new tab is a setting, and it reaches the markup', async () => {
+  const base = {
+    intent: 'save',
+    title: 'The Whispers',
+    timezone: 'UTC',
+    locale: 'en-US',
+    themeMode: 'auto',
+    dayHeadings: '1',
+  };
+
+  // Off by default: no target at all, rather than target="".
+  await post('/admin/settings', base, { cookie: session });
+  const closed = await get('/').then((r) => r.text());
+
+  assert.doesNotMatch(closed, /target=/, 'no target attribute when the setting is off');
+  assert.doesNotMatch(closed, /Links open in a new tab/, 'and nothing to announce');
+
+  // A breaking story, so the band above the days is really on the page. Without
+  // one this test passes while the breaking markup goes unchecked — which it
+  // did, and the band is separate markup that has been missed before.
+  await post('/admin/settings', { ...base, newTab: '1', breakingHours: '12' }, { cookie: session });
+  await post(
+    '/admin',
+    {
+      headline: 'Harbour closed as the swell builds',
+      url: 'https://example.test/newtab-breaking',
+      source: 'Marine Bulletin',
+      breaking: '1',
+    },
+    { cookie: session },
+  );
+
+  const open = await get('/').then((r) => r.text());
+  assert.match(open, /class="breaking"/, 'the breaking band must be on the page');
+
+  const links = [...open.matchAll(/<a href="http[^"]*"[^>]*>/g)].map((m) => m[0]);
+  assert.ok(links.length > 1, 'expected the breaking link and the list links');
+
+  for (const link of links) {
+    assert.match(link, /target="_blank"/, link);
+    // Still there: it applies when the reader opens a link in a new tab too.
+    assert.match(link, /rel="noopener"/, link);
+  }
+
+  // Said once, not once per link.
+  assert.equal(
+    (open.match(/Links open in a new tab/g) ?? []).length,
+    1,
+    'the note belongs before the list, not on every headline',
+  );
+
+  await post('/admin/settings', base, { cookie: session });
+});
+
 it('passphrases are hashed at a cost workerd will actually run', async () => {
   // workerd refuses PBKDF2 above 100,000 iterations outright — a
   // NotSupportedError, not a slow response — on every Cloudflare plan. These

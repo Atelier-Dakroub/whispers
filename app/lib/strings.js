@@ -30,6 +30,7 @@ const EN = {
   notFound: 'Not found',
   notFoundBody: 'There is nothing at this address.',
   backToHeadlines: 'Back to the headlines',
+  newTab: 'Links open in a new tab.',
 };
 
 /**
@@ -53,6 +54,7 @@ const TRANSLATIONS = {
     notFound: 'Introuvable',
     notFoundBody: 'Il n’y a rien à cette adresse.',
     backToHeadlines: 'Retour aux titres',
+    newTab: 'Les liens s’ouvrent dans un nouvel onglet.',
   },
   es: {
     skip: 'Ir a los titulares',
@@ -69,6 +71,7 @@ const TRANSLATIONS = {
     notFound: 'No encontrado',
     notFoundBody: 'No hay nada en esta dirección.',
     backToHeadlines: 'Volver a los titulares',
+    newTab: 'Los enlaces se abren en una pestaña nueva.',
   },
   de: {
     skip: 'Zu den Schlagzeilen springen',
@@ -85,6 +88,7 @@ const TRANSLATIONS = {
     notFound: 'Nicht gefunden',
     notFoundBody: 'Unter dieser Adresse gibt es nichts.',
     backToHeadlines: 'Zurück zu den Schlagzeilen',
+    newTab: 'Links öffnen sich in einem neuen Tab.',
   },
   pt: {
     skip: 'Ir para as manchetes',
@@ -101,6 +105,7 @@ const TRANSLATIONS = {
     notFound: 'Não encontrado',
     notFoundBody: 'Não há nada neste endereço.',
     backToHeadlines: 'Voltar às manchetes',
+    newTab: 'Os links abrem numa nova aba.',
   },
   ar: {
     skip: 'انتقل إلى العناوين',
@@ -117,6 +122,7 @@ const TRANSLATIONS = {
     notFound: 'غير موجود',
     notFoundBody: 'لا يوجد شيء على هذا العنوان.',
     backToHeadlines: 'العودة إلى العناوين',
+    newTab: 'تُفتح الروابط في علامة تبويب جديدة.',
   },
 };
 

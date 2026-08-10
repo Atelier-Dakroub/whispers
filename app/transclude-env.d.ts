@@ -50,6 +50,7 @@ type Settings = {
   breakingDark: string;
   breakingHours: number;
   credit: boolean;
+  newTab: boolean;
   perPage: number;
   passphraseRounds: number;
 };
@@ -68,6 +69,7 @@ type Strings = {
   notFound: string;
   notFoundBody: string;
   backToHeadlines: string;
+  newTab: string;
 };
 type Member = {
   id: string;
@@ -610,6 +612,8 @@ export type IndexData = {
   tagline: string;
   headings: boolean;
   showSource: boolean;
+  newTab: boolean;
+  linkTarget: string | boolean;
   days: Day[];
   items: {
     time: string;
