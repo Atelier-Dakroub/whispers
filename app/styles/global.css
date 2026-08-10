@@ -796,26 +796,29 @@ confirm-button {
   align-items: flex-start;
 }
 
-/* The whole box is the label and therefore the click target. */
+/* The whole label is the click target, and it draws nothing of its own.
+   
+   It used to carry a dashed border. Two of those side by side read as one box
+   with a seam down the middle rather than as two cards — the gap between them
+   became a line. The preview below already has a border and is the thing being
+   aimed at, so the outer one was drawing a boundary nobody needed. */
 .logo-drop {
   position: relative;
   display: block;
   width: 100%;
-  padding: 0.9rem 1rem 1rem;
-  border: 1px dashed var(--rule);
-  border-radius: 4px;
   cursor: pointer;
   margin-bottom: 0.6rem;
 }
 
-.logo-drop:hover {
+/* Hover, focus and drag all land on the preview, which is the target. */
+.logo-drop:hover .logo-ground {
   border-color: var(--link);
 }
 
 /* The input is a pixel wide and clipped, not `display: none`, so it stays
-   focusable and in the accessibility tree. That makes the box the only thing
-   left to paint the focus ring on. */
-.logo-drop:focus-within {
+   focusable and in the accessibility tree — which leaves nothing visible to
+   carry the focus ring except the preview. */
+.logo-drop:focus-within .logo-ground {
   outline: 2px solid var(--link);
   outline-offset: 2px;
   border-color: var(--link);
@@ -834,11 +837,12 @@ confirm-button {
 }
 
 /* Set by the script while a file is over the box. An attribute rather than a
-   class, so it is obvious in the DOM that something transient is going on. */
-.logo-drop[data-over='true'] {
-  border-color: var(--link);
-  border-style: solid;
-  background: var(--raised);
+   class, so it is obvious in the DOM that something transient is going on.
+   Dashed only here: the one moment a drop target should announce itself. */
+.logo-drop[data-over='true'] .logo-ground {
+  border: 1px dashed var(--link);
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
 }
 
 .logo-drop .swatch-title {
@@ -848,6 +852,7 @@ confirm-button {
 .logo-drop .logo-ground {
   display: flex;
   margin-bottom: 0.7rem;
+  transition: border-color 0.12s ease;
 }
 
 .logo-cta {
