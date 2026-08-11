@@ -29,6 +29,12 @@
 
   "routes": [{ "pattern": "demo.whispers.news", "custom_domain": true }],
 
+  // The feed, the canonical link and the share card each need an absolute URL,
+  // and nothing on the server knows the site's own address. Without this they
+  // fall back to the host that asked — right while there is one hostname, and a
+  // cached page carrying the wrong one as soon as there are two.
+  "vars": { "SITE_URL": "https://demo.whispers.news" },
+
   // Declaring a route turns the workers.dev address off by default. Left off
   // here on purpose: a demo wants one address, not two, and a second one would
   // be a copy of this site nobody is looking after.

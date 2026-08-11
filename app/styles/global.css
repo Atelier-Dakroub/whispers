@@ -859,6 +859,14 @@ confirm-button {
   opacity: 0.6;
 }
 
+/* The share card is a picture rather than a wordmark, so it is previewed at a
+   size somebody can judge. Held to the logo's height it would be a thumbnail
+   of a thumbnail. */
+.logo.card {
+  max-width: 100%;
+  max-height: 11rem;
+}
+
 .logo-slot {
   display: flex;
   flex-direction: column;

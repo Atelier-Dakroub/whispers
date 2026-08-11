@@ -8,6 +8,7 @@
 
 import { recent } from './data/articles.js';
 import { all as readSettings } from './data/settings.js';
+import { origin as originOf } from './lib/origin.js';
 
 /** The most a reader wants in one document. The archive is on the site. */
 const LIMIT = 50;
@@ -27,21 +28,6 @@ const escape = (text) =>
     .replace(/'/g, '&apos;');
 
 /**
- * The origin to build absolute links from, since a relative link in a feed is a
- * broken one. Falls back to the request's own origin for a site that has not
- * been told its address yet.
- *
- * @param {Request} request
- * @returns {string}
- */
-const originOf = (request) => {
-  const configured = globalThis.process?.env?.SITE_URL;
-  if (configured) return configured.replace(/\/$/, '');
-
-  return new URL(request.url).origin;
-};
-
-/**
  * Mounts this app's routes and middleware.
  *
  * @param {import('hono').Hono} app
@@ -51,7 +37,10 @@ export default function (app) {
   app.get('/feed.xml', async (c) => {
     const site = await readSettings();
     const items = await recent(LIMIT);
-    const origin = originOf(c.req.raw);
+    // A relative link in a feed is a broken one. This route only ever runs for
+    // a real request, so the null the helper reserves for build time cannot
+    // reach here.
+    const origin = originOf(c.req.raw) ?? '';
 
     // The newest item, never the clock: a feed whose bytes change on every
     // request cannot be cached by anything.

@@ -24,6 +24,15 @@ export const LOGO_DARK = 'logo-dark';
 /** The optional artwork for the sponsor slot. Same table, another row. */
 export const SPONSOR = 'sponsor';
 
+/**
+ * The picture a link to this site shows when somebody pastes it somewhere.
+ *
+ * Uploaded rather than shipped. A card drawn here would carry this product's
+ * name onto the buyer's masthead, and nothing can draw one per site at request
+ * time: workerd has no canvas and no rasterizer.
+ */
+export const SHARE = 'share';
+
 /** What an owner may upload. SVG and PNG cover a wordmark and a bitmap logo. */
 export const ACCEPTED = ['image/svg+xml', 'image/png'];
 
@@ -32,6 +41,33 @@ export const ACCEPTED = ['image/svg+xml', 'image/png'];
  * thought. Base64 makes the stored string about a third larger again.
  */
 export const MAX_BYTES = 256 * 1024;
+
+/**
+ * Where a slot disagrees with those defaults.
+ *
+ * A scraper reads the share card, and that changes all three numbers. It
+ * refuses an SVG, because Facebook, X and Slack all skip one — accepting it
+ * would store a file nothing displays. It takes twice the bytes, being a
+ * picture rather than a wordmark. And it has a floor, because under it the card
+ * is drawn small beside the text instead of above it.
+ */
+const SLOTS = {
+  [SHARE]: {
+    accepts: ['image/png'],
+    max: 512 * 1024,
+    min: { width: 600, height: 315 },
+  },
+};
+
+/**
+ * What one slot accepts. The form reads this too, so the `accept` attribute and
+ * the check behind it cannot drift apart.
+ *
+ * @param {string} [name]
+ * @returns {{ accepts: string[], max: number, min: { width: number, height: number }|null }}
+ */
+export const rulesFor = (name = LOGO) =>
+  SLOTS[name] ?? { accepts: ACCEPTED, max: MAX_BYTES, min: null };
 
 /**
  * @typedef {object} Asset
@@ -82,6 +118,27 @@ const SVG_REFUSALS = [
   [/<!ENTITY/i, 'an entity declaration'],
   [/<(?:image|use|a)\b[^>]*(?:xlink:)?href\s*=\s*["']?(?:https?:)?\/\//i, 'a link to another site'],
 ];
+
+/** The eight bytes every PNG starts with. */
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/**
+ * The pixel size a PNG declares.
+ *
+ * IHDR is required to be the first chunk, so the two numbers are always at the
+ * same offset: eight bytes of signature, four of length, four of type, then the
+ * width and the height as big-endian 32-bit integers.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {{ width: number, height: number }|null} null when it is too short
+ */
+function sizeOf(bytes) {
+  if (bytes.length < 24) return null;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+  return { width: view.getUint32(16), height: view.getUint32(20) };
+}
 
 /**
  * A strong ETag: the same bytes always produce the same one.
@@ -172,17 +229,35 @@ export async function write({ name = LOGO, mime, bytes }) {
   const current = store();
   if (!current) return { ok: false, error: 'No database is reachable.' };
 
-  if (!ACCEPTED.includes(mime)) return { ok: false, error: 'Upload an SVG or a PNG.' };
+  const rules = rulesFor(name);
+
+  if (!rules.accepts.includes(mime)) {
+    return {
+      ok: false,
+      error: rules.accepts.length > 1 ? 'Upload an SVG or a PNG.' : 'Upload a PNG.',
+    };
+  }
+
   if (!bytes?.length) return { ok: false, error: 'That file is empty.' };
-  if (bytes.length > MAX_BYTES) {
-    return { ok: false, error: `Keep it under ${Math.round(MAX_BYTES / 1024)} KB.` };
+  if (bytes.length > rules.max) {
+    return { ok: false, error: `Keep it under ${Math.round(rules.max / 1024)} KB.` };
   }
 
   // The declared type is only the browser's word for it, so check the bytes.
   if (mime === 'image/png') {
-    const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-    if (png.some((byte, i) => bytes[i] !== byte)) {
+    if (PNG_SIGNATURE.some((byte, i) => bytes[i] !== byte)) {
       return { ok: false, error: 'That does not look like a PNG.' };
+    }
+
+    const size = sizeOf(bytes);
+
+    if (rules.min && (!size || size.width < rules.min.width || size.height < rules.min.height)) {
+      return {
+        ok: false,
+        error:
+          `That is ${size ? `${size.width} by ${size.height}` : 'too small to read'}. ` +
+          `Use at least ${rules.min.width} by ${rules.min.height} pixels, and 1200 by 630 to fill the card.`,
+      };
     }
   } else {
     // The whole document, not the first kilobyte: a script at the end is still

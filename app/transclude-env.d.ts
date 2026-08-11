@@ -165,6 +165,10 @@ export type RootLayoutData = {
   ui: string;
   logo: string | null;
   logoDark: string | null;
+  canonical: string | boolean;
+  card: string | boolean;
+  twitterCard: string;
+  ogLocale: string;
   sponsorOn: boolean;
   sponsorText: string;
   sponsorLabel: string;
@@ -204,6 +208,10 @@ export type AdminLayoutContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;
@@ -262,6 +270,10 @@ export type AdminPeopleContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;
@@ -334,6 +346,10 @@ export type AdminSettingsContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;
@@ -370,9 +386,11 @@ export type AdminSettingsData = {
   hasLogo: boolean;
   hasLogoDark: boolean;
   hasSponsor: boolean;
+  hasShare: boolean;
   logoSrc: string | boolean;
   logoDarkSrc: string | boolean;
   sponsorSrc: string | boolean;
+  shareSrc: string | boolean;
   contrast: {
     where: string;
     what: string;
@@ -382,9 +400,12 @@ export type AdminSettingsData = {
   errors: Record<string, string>;
   complaints: string[];
   saved: boolean;
-  notice: string | null;
+  notice: any;
   maxKb: number;
   accepts: string;
+  shareMaxKb: number;
+  shareAccepts: string;
+  shareMin: string;
   defaults: Settings;
 };
 
@@ -418,6 +439,10 @@ export type AdminIndexContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;
@@ -512,6 +537,10 @@ export type LoginContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;
@@ -571,6 +600,10 @@ export type SetupContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;
@@ -630,6 +663,10 @@ export type IndexContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;
@@ -733,6 +770,10 @@ export type AdminArticlesIdContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;
@@ -808,6 +849,10 @@ export type _404Context = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    canonical: string | boolean;
+    card: string | boolean;
+    twitterCard: string;
+    ogLocale: string;
     sponsorOn: boolean;
     sponsorText: string;
     sponsorLabel: string;

@@ -73,7 +73,7 @@ Sign in. All of the controls are below `/admin`.
 | --- | --- |
 | `/admin` | post a headline, and the list of everything posted, 50 to a page |
 | `/admin/articles/<id>` | edit, publish, unpublish, mark breaking, delete |
-| `/admin/settings` | name, tagline, time zone, language, fonts, colors, light/dark, day headings, source, time, rules, density, headlines per page, new-tab links, how long a story stays breaking, the footer credit, logo |
+| `/admin/settings` | name, tagline, time zone, language, fonts, colors, light/dark, day headings, source, time, rules, density, headlines per page, new-tab links, how long a story stays breaking, the footer credit, logo, share card |
 | `/admin/people` | add, remove, and reset a passphrase |
 
 An article has a headline, a link, an optional source, and a date. An article is
@@ -358,6 +358,29 @@ second upload prevents. The tests cover all three rows.
 In the admin, each preview sits on the ground that it is for. It does not sit on
 the theme of the admin.
 
+## The share card
+
+A person pastes a link to the site into Slack, iMessage, or a post. The app
+gives that person the name of the site and the tagline. It gives a picture only
+after you upload one. The upload is at the bottom of `/admin/settings`.
+
+Draw the site, not the mark. The card is 1200 by 630. The logo is a wordmark of
+a different shape, so the two are different files.
+
+The slot takes a PNG only. It refuses an SVG. Facebook, X, and Slack all skip an
+SVG here, so an SVG in this slot is a file that nothing shows. The slot also
+refuses a picture under 600 by 315. A smaller picture becomes a thumbnail beside
+the text, and a thumbnail is worse than no picture.
+
+The app ships no card. A card drawn here would carry the name of this product
+onto your masthead. The app also cannot draw one for you at the time of the
+request, because workerd has no canvas.
+
+**Set `SITE_URL`.** A reader of these tags does not read them on your page, so
+the two URLs in them must be absolute. The app uses `SITE_URL` first. Without
+it, the app uses the host of the request. A site that answers on two names can
+then cache a page that names the other one.
+
 ## Contrast
 
 Each color is the choice of the owner. That is the feature. It also means that
@@ -419,8 +442,8 @@ npm run build
 npm start
 ```
 
-Set `COOKIE_SECRET`, `DB_DRIVER`, and `DATABASE_URL` in the environment.
-`.env.example` lists each variable.
+Set `COOKIE_SECRET`, `DB_DRIVER`, `DATABASE_URL`, and `SITE_URL` in the
+environment. `.env.example` lists each variable.
 
 ## Confirming a delete
 

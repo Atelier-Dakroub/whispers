@@ -1,8 +1,9 @@
 <script server>
-  import { LOGO_DARK, SPONSOR, stamp } from '../data/assets.js';
+  import { LOGO_DARK, SHARE, SPONSOR, stamp } from '../data/assets.js';
   import { DENSITY, all as readSettings, colorScheme } from '../data/settings.js';
   import { DEFAULT_HEADLINE, DEFAULT_INTERFACE, stackOf } from '../lib/fonts.js';
   import { directionOf } from '../lib/locale.js';
+  import { origin } from '../lib/origin.js';
   import { stringsFor } from '../lib/strings.js';
 
   // This layout does not read a cookie, and that is a decision rather than an
@@ -10,8 +11,13 @@
   // to hold it and the build refuses to write it. So the masthead says nothing
   // about who you are, and the admin lives behind /admin, whose own layout reads
   // the session. The reader's page stays cacheable.
-  export default async () => {
+  export default async ({ request }) => {
     const site = await readSettings();
+
+    // Absolute, because og:url and og:image are the two URLs a scraper will not
+    // resolve against the page it read them from.
+    const base = origin(request);
+    const card = await stamp(SHARE);
 
     return {
       site,
@@ -34,6 +40,24 @@
       // replaced logo needs a different URL or nobody sees it.
       logo: await stamp(),
       logoDark: await stamp(LOGO_DARK),
+      // The query is left off on purpose: the page worth sharing is the site,
+      // and `/?page=4` pointing at itself would tell a scraper that page four
+      // is a document of its own.
+      //
+      // `false` on the one prerendered page, where there is no request to read
+      // a host from and SITE_URL may be unset — the tag is dropped rather than
+      // built around a guess.
+      canonical: base && request ? `${base}${new URL(request.url).pathname}` : false,
+      // No og:image:width or :height beside it. Nothing here knows the size
+      // without reading the whole file back on every render, and a scraper
+      // measures the file anyway.
+      card: base && card ? `${base}/share?v=${card}` : false,
+      // The wide card when there is a picture for it, and the small one when
+      // there is not — which is all X can draw from a title and a line of text.
+      twitterCard: card ? 'summary_large_image' : 'summary',
+      // og:locale is language_TERRITORY where everything else here is
+      // language-TERRITORY.
+      ogLocale: site.locale.replace('-', '_'),
       // The sponsor slot. Everything it needs is resolved here, so the template
       // states the markup and decides nothing.
       sponsorOn: site.sponsor && Boolean(site.sponsorText || (await stamp(SPONSOR))),
@@ -63,6 +87,21 @@
 />
 
 <meta name="color-scheme" content="${scheme}" />
+
+<!-- What a link to this site looks like pasted into Slack, iMessage or X.
+     Every value is a setting or an upload, so a buyer's site describes the
+     buyer's paper — there is no artwork shipped here to leave in place by
+     mistake, and no card is drawn without one being uploaded. -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="${site.title}" />
+<meta property="og:title" content="${site.title}" />
+<meta property="og:locale" content="${ogLocale}" />
+<meta property="og:description" if="site.tagline" content="${site.tagline}" />
+<meta property="og:url" if="canonical" content="${canonical}" />
+<meta property="og:image" if="card" content="${card}" />
+<meta property="og:image:type" if="card" content="image/png" />
+<meta property="og:image:alt" if="card" content="${site.title}" />
+<meta name="twitter:card" content="${twitterCard}" />
 
 <a class="skip" href="#headlines">${s.skip}</a>
 

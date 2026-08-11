@@ -3,9 +3,11 @@
     ACCEPTED,
     LOGO,
     LOGO_DARK,
+    SHARE,
     SPONSOR,
     exists,
     MAX_BYTES,
+    rulesFor,
     stamp,
     remove as removeLogo,
     write,
@@ -29,6 +31,24 @@
   // and nothing says why.
   const ZONES = Intl.supportedValuesOf("timeZone");
 
+  /**
+   * What each redirect says when it lands. Every success here is a
+   * Post/Redirect/Get, so the notice travels in the URL rather than in the
+   * action's return — and one table keeps four artworks from sharing a line
+   * that names only the logo.
+   */
+  const NOTICES = {
+    art: "The artwork was saved.",
+    "logo-gone": "The logo is gone. The site name is shown instead.",
+    "logo-dark-gone": "The dark logo is gone. The other artwork is shown instead.",
+    "sponsor-gone": "The sponsor artwork is gone. Its text is shown instead.",
+    "share-gone": "The share card is gone. A shared link will show no picture.",
+    colors: "The colors are back to what they started as.",
+  };
+
+  /** The share card's own limits, which are not the logo's. See assets.js. */
+  const CARD = rulesFor(SHARE);
+
   export default async ({ action, url }) => {
     /** @type {Record<string, string>} */
     const errors = action?.errors ?? {};
@@ -38,6 +58,7 @@
     const hasLogo = await exists(LOGO);
     const hasLogoDark = await exists(LOGO_DARK);
     const hasSponsor = await exists(SPONSOR);
+    const hasShare = await exists(SHARE);
 
     // The version query the masthead uses. Without it a replaced logo keeps
     // showing the old one right where you went to check that it changed — these
@@ -50,6 +71,7 @@
     const logoSrc = hasLogo ? `/logo?v=${await stamp(LOGO)}` : false;
     const logoDarkSrc = hasLogoDark ? `/logo?dark&v=${await stamp(LOGO_DARK)}` : false;
     const sponsorSrc = hasSponsor ? `/sponsor?v=${await stamp(SPONSOR)}` : false;
+    const shareSrc = hasShare ? `/share?v=${await stamp(SHARE)}` : false;
 
     return {
       site,
@@ -58,9 +80,11 @@
       hasLogo,
       hasLogoDark,
       hasSponsor,
+      hasShare,
       logoSrc,
       logoDarkSrc,
       sponsorSrc,
+      shareSrc,
       // Measured, not guessed. Every color here is the owner's to choose, which
       // is the feature — and it means a pair nobody can read is one click away.
       // This says so; it does not refuse. A masthead color that lands just
@@ -72,17 +96,12 @@
       // loudly. Everything that went wrong is listed once, at the top.
       complaints: Object.values(errors),
       saved: asked.has("saved"),
-      // Every success redirects, so a notice is always read off the URL rather
-      // than off the action.
-      notice: asked.has("logo")
-        ? "The logo was replaced."
-        : asked.has("removed")
-          ? "The logo is gone. The site name is shown instead."
-          : asked.has("colors")
-            ? "The colors are back to what they started as."
-            : null,
+      notice: NOTICES[asked.get("done") ?? ""] ?? null,
       maxKb: Math.round(MAX_BYTES / 1024),
       accepts: ACCEPTED.join(","),
+      shareMaxKb: Math.round(CARD.max / 1024),
+      shareAccepts: CARD.accepts.join(","),
+      shareMin: CARD.min ? `${CARD.min.width} by ${CARD.min.height}` : "",
       defaults: DEFAULTS,
     };
   };
@@ -107,25 +126,28 @@
       // land, and the browser scrolls there itself. Without it the page comes
       // back at the top and you hunt for the section you were working in.
       return Response.redirect(
-        new URL("/admin/settings?colors=1#colors", ctx.url),
+        new URL("/admin/settings?done=colors#colors", ctx.url),
         303,
       );
     }
 
-    if (intent === "remove-sponsor") {
-      await removeLogo(SPONSOR);
-      revalidateTag("articles");
-      return Response.redirect(
-        new URL("/admin/settings?removed=1#sponsor-slot", ctx.url),
-        303,
-      );
-    }
+    // Every Remove is the same three steps, so the four differ only in what
+    // they delete, what the page says afterwards, and where it lands.
+    const REMOVALS = {
+      "remove-logo": [LOGO, "logo-gone", "logo"],
+      "remove-logo-dark": [LOGO_DARK, "logo-dark-gone", "logo"],
+      "remove-sponsor": [SPONSOR, "sponsor-gone", "sponsor-slot"],
+      "remove-share": [SHARE, "share-gone", "share"],
+    };
 
-    if (intent === "remove-logo" || intent === "remove-logo-dark") {
-      await removeLogo(intent === "remove-logo-dark" ? LOGO_DARK : LOGO);
+    if (REMOVALS[intent]) {
+      const [slot, done, anchor] = REMOVALS[intent];
+
+      await removeLogo(slot);
       revalidateTag("articles");
+
       return Response.redirect(
-        new URL("/admin/settings?removed=1#logo", ctx.url),
+        new URL(`/admin/settings?done=${done}#${anchor}`, ctx.url),
         303,
       );
     }
@@ -157,14 +179,16 @@
 
     if (!result.ok) return { errors: result.errors, saved: false };
 
-    let notice = null;
+    // Where to land afterwards, when a file came with the form. Null on most
+    // saves, which carry none.
+    let anchor = null;
 
-    // Both artworks come off the same submission. The second is optional and
-    // most saves carry neither.
-    for (const [field, name] of [
-      ["logo", LOGO],
-      ["logoDark", LOGO_DARK],
-      ["sponsorImage", SPONSOR],
+    // Every artwork comes off the same submission, and each one is optional.
+    for (const [field, name, lands] of [
+      ["logo", LOGO, "logo"],
+      ["logoDark", LOGO_DARK, "logo"],
+      ["sponsorImage", SPONSOR, "sponsor-slot"],
+      ["shareImage", SHARE, "share"],
     ]) {
       const upload = form.get(field);
 
@@ -186,7 +210,7 @@
       });
 
       if (!written.ok) return { errors: { [field]: written.error }, saved: false };
-      notice = "The logo was replaced.";
+      anchor = lands;
     }
 
     // The masthead is in the layout, so it is part of every cached page.
@@ -194,7 +218,7 @@
 
     // Post/Redirect/Get. See the note in admin/index.html.
     return Response.redirect(
-      new URL(`/admin/settings?saved=1${notice ? "&logo=1#logo" : ""}`, ctx.url),
+      new URL(`/admin/settings?saved=1${anchor ? `&done=art#${anchor}` : ""}`, ctx.url),
       303,
     );
   };
@@ -896,6 +920,64 @@
         value="remove-logo-dark"
       ></confirm-button>
     </div>
+  </div>
+
+  <h2 id="share">Share card</h2>
+
+  <p class="lede">
+    The picture somebody sees when they paste a link to this site into Slack,
+    iMessage or a post. Without one they still get the name and the tagline,
+    and no picture at all. It is a separate file from the logo because it is a
+    different shape for a different reader — draw the site, not the mark.
+  </p>
+
+  <div class="logo-slot">
+    <label class="logo-drop" data-slot="shareImage">
+      <span class="swatch-title" id="shareImage-title">1200 by 630</span>
+
+      <span class="logo-ground light">
+        <img
+          id="shareImage-preview"
+          src="${shareSrc}"
+          alt=""
+          class="logo card"
+          hidden="${!hasShare}"
+        />
+        <span class="none" id="shareImage-empty" hidden="${hasShare}">Nothing uploaded</span>
+      </span>
+
+      <span class="logo-cta" id="shareImage-cta">Choose a file, or drop one here</span>
+      <!-- PNG and not SVG, because the readers here are scrapers and they skip
+           an SVG. The floor is stated because under it the card is drawn as a
+           small square beside the text instead of above it. -->
+      <span class="hint" id="shareImage-hint">PNG only, up to ${shareMaxKb} KB, and at least ${shareMin} pixels.</span>
+
+      <input
+        id="shareImageFile"
+        class="file-input"
+        form="settings"
+        name="shareImage"
+        type="file"
+        accept="${shareAccepts}"
+        aria-labelledby="shareImage-title shareImage-cta"
+        aria-describedby="shareImage-hint shareImage-chosen"
+        aria-invalid="${errors.shareImage ? 'true' : 'false'}"
+      />
+    </label>
+
+    <span class="chosen" id="shareImage-chosen" aria-live="polite"></span>
+
+    <strong class="error" if="errors.shareImage">${errors.shareImage}</strong>
+    <confirm-button
+      if="hasShare"
+      token="share"
+      label="Remove"
+      heading="Remove the share card?"
+      note="A pasted link will show the name and the tagline, with no picture."
+      confirm="Remove it"
+      cancel="Keep it"
+      value="remove-share"
+    ></confirm-button>
   </div>
 
   <div class="actions">

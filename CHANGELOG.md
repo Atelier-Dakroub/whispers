@@ -22,6 +22,15 @@ of view of somebody running the site rather than reading the code:
   takes text, a link, and optional artwork, and never a script. A paid link
   gets `rel="sponsored nofollow noopener"`.
 - A setting for opening headlines in a new tab. Off by default.
+- Open Graph and Twitter card tags, so a pasted link shows the site's name and
+  its tagline instead of a bare URL. Every value is a setting, so no install
+  advertises another.
+- A share card, uploaded at the bottom of `/admin/settings`. It is the picture
+  in that preview. PNG only and at least 600 by 315 — an SVG is skipped by every
+  scraper, and a small picture is drawn as a thumbnail. No card ships with the
+  app: one drawn here would carry this product's name onto your masthead, and
+  workerd cannot draw one per site. `SITE_URL` is worth setting now, because the
+  two URLs in these tags have to be absolute.
 
 ### Fixed
 

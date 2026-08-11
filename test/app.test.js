@@ -691,9 +691,9 @@ it('the logo box is a label around a real file input, not a div', async () => {
   const page = await get('/admin/settings', session).then((r) => r.text());
 
   const labels = page.match(/<label class="logo-drop"[\s\S]*?<\/label>/g) ?? [];
-  // Two logos and the sponsor artwork. Every upload on this page uses the same
-  // box, so each one is checked for all of it below.
-  assert.equal(labels.length, 3, 'one box per artwork');
+  // Two logos, the sponsor artwork and the share card. Every upload on this
+  // page uses the same box, so each one is checked for all of it below.
+  assert.equal(labels.length, 4, 'one box per artwork');
 
   for (const box of labels) {
     // A real input, still posting to the settings form. The whole point of
@@ -1495,4 +1495,85 @@ it('no page that reads the database was written to a file', () => {
 
   assert.ok(!files.includes('index.html'), 'the headlines change, so the page is not a file');
   assert.ok(!files.includes('admin'), 'nor is anything behind the guard');
+});
+
+// ── the share card ─────────────────────────────────────────────────────────
+
+/**
+ * A PNG of a stated size, and nothing else. The signature, then IHDR — whose
+ * length, width and height are all this app reads. Real pixels would only make
+ * the file bigger.
+ */
+const png = (width, height) => {
+  const bytes = new Uint8Array(33);
+  const view = new DataView(bytes.buffer);
+
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  view.setUint32(8, 13);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+
+  return new File([bytes], 'card.png', { type: 'image/png' });
+};
+
+const savingCard = (file) =>
+  postFile('/admin/settings', { intent: 'save', title: 'The Whispers', shareImage: file }, session);
+
+it('a shared link carries the site, and a card only once one is uploaded', async () => {
+  const bare = await get('/').then((r) => r.text());
+
+  // The words are always there, because every one of them is a setting.
+  assert.match(bare, /<meta property="og:title" content="The Whispers"/);
+  assert.match(bare, /<meta property="og:type" content="website"/);
+  assert.match(bare, /<meta property="og:locale" content="en_US"/, 'underscore, not hyphen');
+  assert.match(bare, /<meta property="og:url" content="http:\/\/localhost\/"/);
+
+  // The picture is not, and the small card is what X can draw without one.
+  assert.doesNotMatch(bare, /og:image/, 'no card is shipped, so none is claimed');
+  assert.match(bare, /name="twitter:card" content="summary"/);
+
+  assert.equal((await savingCard(png(1200, 630))).status, 303);
+
+  const shared = await get('/').then((r) => r.text());
+  const src = shared.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ?? '';
+
+  // Absolute. A scraper reads the tag away from the page it came from and will
+  // not resolve a path against it.
+  assert.match(src, /^http:\/\/localhost\/share\?v=/, `og:image was ${src}`);
+  assert.match(shared, /<meta property="og:image:type" content="image\/png"/);
+  assert.match(shared, /name="twitter:card" content="summary_large_image"/);
+
+  const served = await get(new URL(src).pathname + new URL(src).search);
+  assert.equal(served.status, 200);
+  assert.equal(served.headers.get('content-type'), 'image/png');
+});
+
+it('the card refuses what a scraper would not draw', async () => {
+  const svg = new File(
+    ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"></svg>'],
+    'card.svg',
+    { type: 'image/svg+xml' },
+  );
+
+  // Facebook, X and Slack all skip an SVG og:image, so storing one would mean
+  // holding a file nothing displays. The logo slot still takes one.
+  assert.match(await savingCard(svg).then((r) => r.text()), /Upload a PNG/);
+
+  // Too small is drawn beside the text rather than above it, which is worse
+  // than sending no picture at all.
+  assert.match(await savingCard(png(400, 210)).then((r) => r.text()), /400 by 210/);
+
+  // And the good one is still the one being served.
+  assert.equal((await get('/share')).status, 200);
+});
+
+it('removing the card takes the tag off the page', async () => {
+  assert.equal(
+    (await post('/admin/settings', { intent: 'remove-share' }, { cookie: session })).status,
+    303,
+  );
+
+  assert.equal((await get('/share')).status, 404);
+  assert.doesNotMatch(await get('/').then((r) => r.text()), /og:image/);
 });
