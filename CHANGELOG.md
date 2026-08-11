@@ -14,7 +14,11 @@ of view of somebody running the site rather than reading the code:
   add.
 - **Patch** — fixes and wording, no migration.
 
-## Unreleased
+## 1.1.0 — 2026-08-11
+
+No migration. Upgrading is `git pull` (or the release) and `npm install`. The
+`npm install` is not optional this time: the cache fix below is in
+`@transclude/core` 0.10.2.
 
 ### Added
 
@@ -31,6 +35,18 @@ of view of somebody running the site rather than reading the code:
   app: one drawn here would carry this product's name onto your masthead, and
   workerd cannot draw one per site. `SITE_URL` is worth setting now, because the
   two URLs in these tags have to be absolute.
+
+### Changed
+
+- The reader's page breathes more. Day groups sit further apart, a day heading
+  is heavier and carries a 2px rule, the last headline in a group drops its own
+  rule, and the footer loses its top border. The last two work together: a group
+  used to end with a line and the footer began with another, so the page stacked
+  rules where it needed space. Nothing is configurable here and nothing you set
+  has changed — the page simply looks different after this upgrade.
+- `SITE_URL` now builds the canonical link and the share card as well as the
+  feed. It is still optional: without it each falls back to the host that asked,
+  which is right until the site answers on two names. Worth setting now.
 
 ### Fixed
 
