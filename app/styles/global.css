@@ -20,7 +20,7 @@
    which means an element with the attribute stays on screen. `.logo` setting
    `display: block` did exactly that: the empty preview was still a flex item,
    and it pushed the "Nothing uploaded" text off center.
-   
+
    `!important` because the whole point is to outrank whatever display the
    element was given. If something needs to be laid out while hidden, it should
    not be using the attribute. */
@@ -35,14 +35,14 @@ body {
 
   /* Derived rather than configured. Six colors is already a lot to ask
      somebody to choose; a muted gray and a rule are arithmetic on two of them.
-     
+
      But the arithmetic has to differ by polarity, and this is the part that was
      wrong. One percentage cannot serve both: mixing 55% of the ink reaches
      APCA Lc 70 on a light ground and Lc 33 on a dark one — and Lc 33 is not a
      readable value for the day headings, sources and times this color carries.
      The rule was worse: 15% computed to Lc 0.0 in dark mode, which is APCA's
      way of saying the line was not there at all.
-     
+
      So each is mixed twice, against the raw light and dark tokens rather than
      the resolved ones, and `light-dark()` picks. Measured: muted clears Lc 60
      and the rule is visible in both. */
@@ -214,7 +214,7 @@ main {
 /* ── the headlines ────────────────────────────────────────────────────── */
 
 .day {
-  margin: 2rem 0 0;
+  margin: 2.5rem 0 0;
 }
 
 .day-heading {
@@ -223,12 +223,12 @@ main {
   /* 12.8px, not 11.5px. Small uppercase type is hard to read at any contrast,
      and the fix for small is bigger before it is darker. */
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--muted);
   padding-bottom: 0.35rem;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 2px solid var(--rule);
 }
 
 .headlines {
@@ -246,6 +246,10 @@ main {
   /* A width of `0` rather than `border: none`, so the setting changes one value
      and the style and color stay written down. */
   border-bottom: var(--headline-rule) solid var(--rule);
+}
+
+.headlines li:last-child {
+  border-bottom: 0;
 }
 
 /* The headline is the link, and it is the whole line: a bigger target than a
@@ -316,7 +320,6 @@ main {
   max-width: var(--measure);
   margin: 3rem auto 0;
   padding-top: 1rem;
-  border-top: 1px solid var(--rule);
   font-family: var(--font-ui);
   font-size: 0.8rem;
   color: var(--muted);
@@ -863,7 +866,7 @@ confirm-button {
 }
 
 /* The whole label is the click target, and it draws nothing of its own.
-   
+
    It used to carry a dashed border. Two of those side by side read as one box
    with a seam down the middle rather than as two cards — the gap between them
    became a line. The preview below already has a border and is the thing being
@@ -905,7 +908,7 @@ confirm-button {
 /* Set by the script while a file is over the box. An attribute rather than a
    class, so it is obvious in the DOM that something transient is going on.
    Dashed only here: the one moment a drop target should announce itself. */
-.logo-drop[data-over='true'] .logo-ground {
+.logo-drop[data-over="true"] .logo-ground {
   border: 1px dashed var(--link);
   outline: 2px solid var(--link);
   outline-offset: 2px;
