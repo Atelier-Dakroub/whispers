@@ -1577,3 +1577,32 @@ it('removing the card takes the tag off the page', async () => {
   assert.equal((await get('/share')).status, 404);
   assert.doesNotMatch(await get('/').then((r) => r.text()), /og:image/);
 });
+
+it('the list of sections matches the sections', async () => {
+  const page = await get('/admin/settings', session).then((r) => r.text());
+
+  const toc = page.match(/<nav class="toc"[\s\S]*?<\/nav>/)?.[0] ?? '';
+  const links = [...toc.matchAll(/href="#([^"]+)"/g)].map((found) => found[1]);
+
+  // Every dialog carries an <h2> of its own, and those are not sections.
+  const headings = [...page.matchAll(/<h2 id="([^"]+)"/g)]
+    .map((found) => found[1])
+    .filter((id) => !id.startsWith('confirm-'));
+
+  assert.ok(links.length >= 8, `the list has ${links.length} links`);
+
+  // A link with nothing to scroll to does nothing at all, and says nothing
+  // about it.
+  for (const id of links) {
+    assert.ok(headings.includes(id), `#${id} is linked and is not a section`);
+  }
+
+  // And the other way: a section nobody can reach from the top is a section
+  // that was added without its link.
+  for (const id of headings) {
+    assert.ok(links.includes(id), `#${id} is a section with no link to it`);
+  }
+
+  // In the order somebody meets them, or the list describes a different page.
+  assert.deepEqual(links, headings, 'the list is out of step with the page');
+});
