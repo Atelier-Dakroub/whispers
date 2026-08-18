@@ -719,6 +719,22 @@
     black ink is the one for a light page.
   </p>
 
+  <!-- Outside the form, like the file inputs under it, so the `form` attribute
+       is what puts it back in. The hidden field is what makes an unticked box
+       say `0` rather than say nothing. -->
+  <label class="checkbox" for="showTitle">
+    <input type="hidden" name="showTitle" value="0" form="settings" />
+    <input
+      id="showTitle"
+      name="showTitle"
+      type="checkbox"
+      value="1"
+      form="settings"
+      checked="${site.showTitle}"
+    />
+    <span>Write the site's name under the logo. Without a logo it is written anyway.</span>
+  </label>
+
   <div class="logos">
     <div class="logo-slot">
       <!-- The whole box is the label, and the input inside is a real

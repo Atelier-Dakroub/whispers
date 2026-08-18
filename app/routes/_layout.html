@@ -19,6 +19,16 @@
     const base = origin(request);
     const card = await stamp(SHARE);
 
+    // A version stamp, not the bytes. /logo is cached for a year, so a
+    // replaced logo needs a different URL or nobody sees it.
+    const logo = await stamp();
+    const logoDark = await stamp(LOGO_DARK);
+
+    // Whether the masthead will draw artwork at all. The dark artwork on its
+    // own is not enough: it is used only on a site pinned to dark, and a light
+    // page falls back to the name.
+    const artwork = Boolean(logo) || Boolean(logoDark && site.themeMode === 'dark');
+
     return {
       site,
       scheme: colorScheme(site),
@@ -36,10 +46,14 @@
       // or removed falls back instead of rendering an empty font-family.
       headline: stackOf(site.fontHeadline, DEFAULT_HEADLINE).css,
       ui: stackOf(site.fontInterface, DEFAULT_INTERFACE).css,
-      // A version stamp, not the bytes. /logo is cached for a year, so a
-      // replaced logo needs a different URL or nobody sees it.
-      logo: await stamp(),
-      logoDark: await stamp(LOGO_DARK),
+      logo,
+      logoDark,
+      // The name in type, under the artwork. Asked for, and only when there is
+      // artwork to sit under — with none, the name is the masthead already.
+      nameUnderLogo: artwork && site.showTitle,
+      // Empty when the name is written beside the picture, or a screen reader
+      // hears the name twice: once as the picture, once as the line under it.
+      logoAlt: artwork && site.showTitle ? '' : site.title,
       // The query is left off on purpose: the page worth sharing is the site,
       // and `/?page=4` pointing at itself would tell a scraper that page four
       // is a document of its own.
@@ -113,19 +127,24 @@
          the light artwork to a reader whose laptop is in light mode. -->
     <picture if="logo && logoDark && site.themeMode === 'auto'">
       <source media="(prefers-color-scheme: dark)" srcset="/logo?dark&amp;v=${logoDark}" />
-      <img src="/logo?v=${logo}" alt="${site.title}" class="logo" />
+      <img src="/logo?v=${logo}" alt="${logoAlt}" class="logo" />
     </picture>
 
     <img
       else-if="logoDark && site.themeMode === 'dark'"
       src="/logo?dark&amp;v=${logoDark}"
-      alt="${site.title}"
+      alt="${logoAlt}"
       class="logo"
     />
 
-    <img else-if="logo" src="/logo?v=${logo}" alt="${site.title}" class="logo" />
+    <img else-if="logo" src="/logo?v=${logo}" alt="${logoAlt}" class="logo" />
 
     <span else>${site.title}</span>
+
+    <!-- The name written under the artwork, for a site that wants both. A
+         second element rather than a branch of the chain above: this one is
+         drawn beside the picture, not instead of it. -->
+    <span class="site-name" if="nameUnderLogo">${site.title}</span>
   </a>
 
   <p class="tagline" if="site.tagline">${site.tagline}</p>

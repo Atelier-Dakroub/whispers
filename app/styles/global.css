@@ -199,6 +199,16 @@ a {
   width: auto;
 }
 
+/* The name under the artwork, on a site that keeps both. Smaller than the
+   wordmark it would be on its own: the mark is what a reader reads first here,
+   and two things at the same size are a fight rather than a masthead. */
+.site-name {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.45em;
+  letter-spacing: -0.01em;
+}
+
 .tagline {
   margin: 0.45rem 0 0;
   color: var(--muted);

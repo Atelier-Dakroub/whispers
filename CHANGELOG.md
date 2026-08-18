@@ -14,6 +14,17 @@ of view of somebody running the site rather than reading the code:
   add.
 - **Patch** — fixes and wording, no migration.
 
+## Unreleased
+
+No migration. A setting is a row, and a site without that row reads the default.
+
+### Added
+
+- A setting for writing the site's name under the logo. An uploaded logo used
+  to stand in place of the name, with no way to keep both. Off by default, so
+  an upgrade draws every masthead as it drew it before. The picture's `alt` is
+  empty while the name is written, or a screen reader reads the name twice.
+
 ## 1.1.0 — 2026-08-11
 
 No migration. Upgrading is `git pull` (or the release) and `npm install`. The

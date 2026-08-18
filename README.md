@@ -73,7 +73,7 @@ Sign in. All of the controls are below `/admin`.
 | --- | --- |
 | `/admin` | post a headline, and the list of everything posted, 50 to a page |
 | `/admin/articles/<id>` | edit, publish, unpublish, mark breaking, delete |
-| `/admin/settings` | name, tagline, time zone, language, fonts, colors, light/dark, day headings, source, time, rules, density, headlines per page, new-tab links, how long a story stays breaking, the footer credit, logo, share card |
+| `/admin/settings` | name, tagline, time zone, language, fonts, colors, light/dark, day headings, source, time, rules, density, headlines per page, new-tab links, how long a story stays breaking, the footer credit, logo, whether the name is written beside it, share card |
 | `/admin/people` | add, remove, and reset a passphrase |
 
 An article has a headline, a link, an optional source, and a date. An article is

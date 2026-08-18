@@ -687,6 +687,41 @@ it('a dark logo is used only when the dark background is certain', async () => {
   await post('/admin/settings', { ...base, themeMode: 'auto' }, { cookie: session });
 });
 
+it('the site name is written beside the logo only when it is asked for', async () => {
+  const file = () =>
+    new File(
+      ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 32"></svg>'],
+      'logo.svg',
+      { type: 'image/svg+xml' },
+    );
+
+  const base = { intent: 'save', title: 'The Whispers', timezone: 'UTC', locale: 'en-US' };
+
+  // No artwork: the name is the masthead, and the setting has nothing to say.
+  await post('/admin/settings', { ...base, showTitle: '1' }, { cookie: session });
+
+  const bare = await get('/').then((r) => r.text());
+  assert.match(bare, /<span>The Whispers<\/span>/);
+  assert.doesNotMatch(bare, /class="site-name"/);
+
+  // Artwork, and the setting still on: both are drawn, and the picture's alt
+  // is empty so the name is not read twice.
+  await postFile('/admin/settings', { ...base, logo: file() }, session);
+
+  const both = await get('/').then((r) => r.text());
+  assert.match(both, /<img src="\/logo\?v=[^"]+" alt="" class="logo">/);
+  assert.match(both, /<span class="site-name">The Whispers<\/span>/);
+
+  // Off: the artwork stands in for the name, and carries it as its alt.
+  await post('/admin/settings', { ...base, showTitle: '0' }, { cookie: session });
+
+  const alone = await get('/').then((r) => r.text());
+  assert.doesNotMatch(alone, /class="site-name"/);
+  assert.match(alone, /<img src="\/logo\?v=[^"]+" alt="The Whispers" class="logo">/);
+
+  await post('/admin/settings', { intent: 'remove-logo' }, { cookie: session });
+});
+
 it('the logo box is a label around a real file input, not a div', async () => {
   const page = await get('/admin/settings', session).then((r) => r.text());
 

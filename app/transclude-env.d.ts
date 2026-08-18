@@ -30,6 +30,7 @@ type __CookieOptions = {
 type Settings = {
   title: string;
   tagline: string;
+  showTitle: boolean;
   timezone: string;
   locale: string;
   themeMode: 'auto' | 'light' | 'dark';
@@ -165,6 +166,8 @@ export type RootLayoutData = {
   ui: string;
   logo: string | null;
   logoDark: string | null;
+  nameUnderLogo: boolean;
+  logoAlt: string;
   canonical: string | boolean;
   card: string | boolean;
   twitterCard: string;
@@ -208,6 +211,8 @@ export type AdminLayoutContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;
@@ -270,6 +275,8 @@ export type AdminPeopleContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;
@@ -346,6 +353,8 @@ export type AdminSettingsContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;
@@ -439,6 +448,8 @@ export type AdminIndexContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;
@@ -537,6 +548,8 @@ export type LoginContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;
@@ -600,6 +613,8 @@ export type SetupContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;
@@ -663,6 +678,8 @@ export type IndexContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;
@@ -770,6 +787,8 @@ export type AdminArticlesIdContext = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;
@@ -849,6 +868,8 @@ export type _404Context = {
     ui: string;
     logo: string | null;
     logoDark: string | null;
+    nameUnderLogo: boolean;
+    logoAlt: string;
     canonical: string | boolean;
     card: string | boolean;
     twitterCard: string;

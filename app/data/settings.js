@@ -11,6 +11,7 @@ import { store } from './db.js';
  * @typedef {object} Settings
  * @property {string} title shown in the masthead and the <title>
  * @property {string} tagline under the masthead, optional
+ * @property {boolean} showTitle write the name as well, when a logo is up
  * @property {string} timezone IANA name; decides where a day ends
  * @property {string} locale how a day heading is spelled
  * @property {'auto'|'light'|'dark'} themeMode
@@ -44,6 +45,12 @@ import { store } from './db.js';
 export const DEFAULTS = {
   title: 'whispers.news',
   tagline: '',
+  // Whether the masthead writes the name as well as drawing the logo. Off,
+  // because a logo stood in place of the name before this setting existed and
+  // an upgrade must not redraw a masthead nobody touched. With no logo the
+  // name is written either way — the other reading is a masthead with nothing
+  // in it.
+  showTitle: false,
   timezone: 'UTC',
   // `404.html` is written at build time, where there is no database to read a
   // setting from, so the one page that cannot ask takes it from the
@@ -109,6 +116,7 @@ const DENSITIES = ['compact', 'normal', 'relaxed'];
  * flag came to be validated here and never sent from there.
  */
 export const FLAGS = [
+  'showTitle',
   'dayHeadings',
   'showSource',
   'showTime',
