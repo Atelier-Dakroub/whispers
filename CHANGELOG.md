@@ -14,11 +14,11 @@ of view of somebody running the site rather than reading the code:
   add.
 - **Patch** — fixes and wording, no migration.
 
-## Unreleased
+## 1.2.0 — 2026-08-28
 
 No migration. A setting is a row, and a site without that row reads the default.
-The `npm install` is not optional this time: the framework moved on, and the
-site needs the new version.
+Upgrading is `git pull` (or the release) and `npm install`. The `npm install` is
+not optional this time: the framework below the site moved to 0.17.0.
 
 ### Added
 
