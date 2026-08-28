@@ -17,6 +17,8 @@ of view of somebody running the site rather than reading the code:
 ## Unreleased
 
 No migration. A setting is a row, and a site without that row reads the default.
+The `npm install` is not optional this time: the framework moved on, and the
+site needs the new version.
 
 ### Added
 
@@ -24,6 +26,14 @@ No migration. A setting is a row, and a site without that row reads the default.
   to stand in place of the name, with no way to keep both. Off by default, so
   an upgrade draws every masthead as it drew it before. The picture's `alt` is
   empty while the name is written, or a screen reader reads the name twice.
+
+### Changed
+
+- The site now runs on `@transclude/core` 0.17.0, up from 0.10.2. An element
+  declares itself in one `<script element>` block there, so
+  `app/elements/confirm-button.html` carries its properties as an export of
+  that block. The button and its dialog behave as they did. Core 0.17 also
+  wants TypeScript 7, which `npm install` brings.
 
 ## 1.1.0 — 2026-08-11
 

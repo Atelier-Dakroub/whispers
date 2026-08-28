@@ -14,6 +14,17 @@ import { origin as originOf } from './lib/origin.js';
 const LIMIT = 50;
 
 /**
+ * The paths that are not public.
+ *
+ * Nothing here gates them — `admin/_layout.html` does, through `member(ctx)` in
+ * `app/lib/guard.js`, and the build already leaves every page under a guard to
+ * the server. This says the same thing in the one place a build reads without
+ * running an app, so a page below `admin/` can never be written to
+ * `dist/static` and handed out by a static host.
+ */
+export const gated = ['/admin', '/admin/*'];
+
+/**
  * Escapes text for XML.
  *
  * @param {unknown} text

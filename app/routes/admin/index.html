@@ -107,6 +107,7 @@
 
     // Advisory, and only when a key is configured. `reputation` never throws
     // and never blocks for more than three seconds.
+    /** @type {string | null} */
     let flagReason = null;
     if (!forced) {
       const verdict = await reputation(link.url);

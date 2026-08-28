@@ -33,7 +33,7 @@ type Settings = {
   showTitle: boolean;
   timezone: string;
   locale: string;
-  themeMode: 'auto' | 'light' | 'dark';
+  themeMode: 'auto' | 'dark' | 'light';
   fontHeadline: string;
   fontInterface: string;
   bgLight: string;
@@ -60,21 +60,21 @@ type Settings = {
   passphraseRounds: number;
 };
 type Strings = {
-  skip: string;
-  feed: string;
-  signIn: string;
+  backToHeadlines: string;
+  breaking: string;
   empty: string;
   emptyInvite: string;
-  newer: string;
-  older: string;
+  feed: string;
   morePages: string;
-  pageOf: string;
-  breaking: string;
-  poweredBy: string;
+  newTab: string;
+  newer: string;
   notFound: string;
   notFoundBody: string;
-  backToHeadlines: string;
-  newTab: string;
+  older: string;
+  pageOf: string;
+  poweredBy: string;
+  signIn: string;
+  skip: string;
 };
 type Member = {
   id: string;
@@ -107,7 +107,7 @@ type Article = {
   createdBy: string | null;
 };
 
-/** Properties of `<confirm-button>`, from its <script properties> block. */
+/** Properties of `<confirm-button>`, from its <script element> block. */
 export type ConfirmButtonProps = {
   token: string;
   label: string;
@@ -138,7 +138,6 @@ export type RootLayoutContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -161,7 +160,7 @@ export type RootLayoutData = {
   };
   rule: string;
   lang: string;
-  dir: 'rtl' | 'ltr';
+  dir: 'ltr' | 'rtl';
   headline: string;
   ui: string;
   logo: string | null;
@@ -206,7 +205,7 @@ export type AdminLayoutContext = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -233,7 +232,6 @@ export type AdminLayoutContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -270,7 +268,7 @@ export type AdminPeopleContext = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -303,7 +301,6 @@ export type AdminPeopleContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -348,7 +345,7 @@ export type AdminSettingsContext = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -381,7 +378,6 @@ export type AdminSettingsContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -443,7 +439,7 @@ export type AdminIndexContext = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -476,7 +472,6 @@ export type AdminIndexContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -486,7 +481,6 @@ export type AdminIndexContext = {
 export type AdminIndexData = {
   site: Settings;
   items: {
-    when: string;
     id: string;
     headline: string;
     url: string;
@@ -498,6 +492,7 @@ export type AdminIndexData = {
     createdAt: string;
     updatedAt: string;
     createdBy: string | null;
+    when: string;
   }[];
   total: number;
   drafts: number;
@@ -543,7 +538,7 @@ export type LoginContext = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -570,7 +565,6 @@ export type LoginContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -608,7 +602,7 @@ export type SetupContext = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -635,7 +629,6 @@ export type SetupContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -673,7 +666,7 @@ export type IndexContext = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -700,7 +693,6 @@ export type IndexContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -710,7 +702,6 @@ export type IndexContext = {
 export type IndexData = {
   s: Strings;
   urgent: {
-    time: string;
     id: string;
     headline: string;
     url: string;
@@ -722,6 +713,7 @@ export type IndexData = {
     createdAt: string;
     updatedAt: string;
     createdBy: string | null;
+    time: string;
   }[];
   pageLabel: string;
   title: string;
@@ -732,7 +724,6 @@ export type IndexData = {
   linkTarget: string | boolean;
   days: Day[];
   items: {
-    time: string;
     id: string;
     headline: string;
     url: string;
@@ -744,6 +735,7 @@ export type IndexData = {
     createdAt: string;
     updatedAt: string;
     createdBy: string | null;
+    time: string;
   }[];
   page: number;
   pages: number;
@@ -782,7 +774,7 @@ export type AdminArticlesIdContext = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -815,7 +807,6 @@ export type AdminArticlesIdContext = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void
@@ -863,7 +854,7 @@ export type _404Context = {
     };
     rule: string;
     lang: string;
-    dir: 'rtl' | 'ltr';
+    dir: 'ltr' | 'rtl';
     headline: string;
     ui: string;
     logo: string | null;
@@ -890,7 +881,6 @@ export type _404Context = {
     headers: Headers
   };
   cookies: __Cookies;
-  htmlAttrs: Record<string, string | boolean | null>;
   absolute: (path: string) => string;
   revalidateTag: (tag: string) => void;
   after: (work: Promise<unknown>) => void

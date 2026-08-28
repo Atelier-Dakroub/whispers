@@ -473,7 +473,10 @@ the safe direction, but you must know it.
 is a second check. Keep it: it costs one line, and it prevents a silent
 unauthenticated write. It also stays correct if somebody moves a page out from
 below its layout. `test/app.test.js` tests that the app refuses a signed-out
-POST to each admin route.
+POST to each admin route. `app/server.js` names the same paths in its `gated`
+export. Middleware does not run during a build, so that list is the only thing
+the build reads about a gate, and it keeps a page below `admin/` out of the
+static output.
 
 **A page that reads the database needs `export const prerender = false`.** The
 build runs on a machine with no binding. Without that line the build writes a
